@@ -578,28 +578,54 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 function setCType(el,t){cType=t;document.querySelectorAll('#create-modal .sel-pill').forEach(p=>{if(['rave','chill','house','underground'].includes(p.textContent.trim().split(' ')[1]?.toLowerCase()||p.textContent))p.classList.remove('on');});el.classList.add('on');}
 function setCPriv(el,p){cPriv=p;document.querySelectorAll('#create-modal .pills-row:last-of-type .sel-pill').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
 
-function doCreate(){
+async function doCreate(){
   const title=document.getElementById('c-title').value.trim();
   const addr=document.getElementById('c-addr').value.trim();
   if(!title||!addr){notify('Name & Adresse fehlen!','#ff9f0a');return;}
-  
-  const center=leafMap?leafMap.getCenter():{lat:52.510,lng:13.405};
+
+  // Show loading
+  const createBtn=document.querySelector('.create-modal button[onclick="doCreate()"]');
+  createBtn.textContent='📍 Adresse wird gesucht...';
+  createBtn.disabled=true;
+
+  let lat, lng;
+  try {
+    // Nominatim Geocoding - free, no API key needed
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`,{
+      headers:{'Accept-Language':'de','User-Agent':'VYBE-App'}
+    });
+    const data = await res.json();
+    if(data.length > 0){
+      lat = parseFloat(data[0].lat);
+      lng = parseFloat(data[0].lon);
+    } else {
+      // Fallback to map center
+      const center = leafMap ? leafMap.getCenter() : {lat:52.510,lng:13.405};
+      lat = center.lat; lng = center.lng;
+      notify('Adresse nicht gefunden — Pin in Kartenmitte gesetzt','#ff9f0a');
+    }
+  } catch(e) {
+    const center = leafMap ? leafMap.getCenter() : {lat:52.510,lng:13.405};
+    lat = center.lat; lng = center.lng;
+  }
+
   const ev={
-    id:Date.now(),title,area:addr.split(',')[1]?.trim()||addr,type:cType,
-    time:(document.getElementById('c-date').value||'Heute')+' '+( document.getElementById('c-time').value||'?:??'),
+    id:Date.now(),title,area:addr,type:cType,
+    time:(document.getElementById('c-date').value||'Heute')+' '+(document.getElementById('c-time').value||'?:??'),
     guests:1,maxGuests:parseInt(document.getElementById('c-max').value)||20,
     color:COLORS[Math.floor(Math.random()*COLORS.length)],hot:false,
-    lat:center.lat+(Math.random()-.5)*.01,
-    lng:center.lng+(Math.random()-.5)*.01,
+    lat, lng,
     desc:document.getElementById('c-desc').value||'',
   };
   events.unshift(ev);
   joined.push(ev.id);
   closeModal('create-modal');
   ['c-title','c-addr','c-date','c-time','c-vibe','c-max','c-desc'].forEach(id=>document.getElementById(id).value='');
+  createBtn.textContent='EVENT ERSTELLEN 🎉';
+  createBtn.disabled=false;
   renderMarkers();
-  if(leafMap)leafMap.panTo([ev.lat,ev.lng],{animate:true});
-  notify('Event erstellt! 🎉','#30d158');
+  if(leafMap)leafMap.setView([lat,lng],16,{animate:true});
+  notify('Event erstellt! 🎉 Pin gesetzt auf: '+addr,'#30d158');
 }
 
 // CHAT
