@@ -463,11 +463,11 @@ textarea.inp{resize:none;min-height:80px;}
 // SUPABASE
 const SUPABASE_URL = 'https://pqtikhssrvheybqjbfvb.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UauLbLhpUROiQXP_oqT4fw_Sp0dGM2F';
-let supabase = null;
+let sb = null;
 
 function initSupabase() {
   try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log('Supabase connected!');
     loadEvents();
   } catch(e) {
@@ -476,9 +476,9 @@ function initSupabase() {
 }
 
 async function loadEvents() {
-  if(!supabase) return;
+  if(!sb) return;
   try {
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('events')
       .select('*')
       .order('created_at', { ascending: false });
@@ -506,9 +506,9 @@ async function loadEvents() {
 }
 
 async function saveEventToDb(ev) {
-  if(!supabase) return;
+  if(!sb) return;
   try {
-    const { error } = await supabase.from('events').insert([{
+    const { error } = await sb.from('events').insert([{
       title: ev.title,
       address: ev.area,
       area: ev.area,
