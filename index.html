@@ -163,6 +163,13 @@ textarea.inp{resize:none;min-height:80px;}
 /* NOTIF */
 #notif{position:fixed;top:50px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:100px;font-weight:700;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;font-family:'Syne';}
 #notif.show{opacity:1;}
+
+/* Autocomplete dropdown */
+.addr-option{padding:12px 16px;cursor:pointer;font-size:13px;color:#ccc;border-bottom:1px solid #1a1a1a;transition:background .15s;}
+.addr-option:last-child{border-bottom:none;}
+.addr-option:hover,.addr-option:active{background:#1a1a1a;color:#fff;}
+.addr-option .main{font-weight:700;color:#fff;margin-bottom:2px;}
+.addr-option .sub{font-size:11px;color:#555;}
 </style>
 </head>
 <body>
@@ -421,7 +428,11 @@ textarea.inp{resize:none;min-height:80px;}
     <button class="back" onclick="closeModal('create-modal')">✕</button>
   </div>
   <div class="field"><div class="field-lbl">EVENT NAME *</div><input class="inp" id="c-title" placeholder="z.B. Dachterrassenparty"/></div>
-  <div class="field"><div class="field-lbl">ADRESSE *</div><input class="inp" id="c-addr" placeholder="Straße + Nummer, Stadt"/></div>
+  <div class="field" style="position:relative;">
+    <div class="field-lbl">ADRESSE *</div>
+    <input class="inp" id="c-addr" placeholder="Straße + Nummer, Stadt" autocomplete="off" oninput="addrSearch(this.value)" onblur="setTimeout(()=>{const d=document.getElementById('addr-dropdown');if(d)d.style.display='none'},200)"/>
+    <div id="addr-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#111;border:1px solid #333;border-radius:14px;overflow:hidden;z-index:9999;max-height:200px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.8);"></div>
+  </div>
   <div class="field"><div class="field-lbl">UHRZEIT</div><input class="inp" id="c-time" placeholder="22:00"/></div>
   <div class="field"><div class="field-lbl">DATUM</div><input class="inp" id="c-date" placeholder="Heute / Sa, 25.05"/></div>
   <div class="field"><div class="field-lbl">VIBE / MUSIK</div><input class="inp" id="c-vibe" placeholder="z.B. Techno / House"/></div>
@@ -591,6 +602,13 @@ async function doCreate(){
   let lat, lng;
   try {
     // Nominatim Geocoding - free, no API key needed
+    // Use pre-selected coords if available
+    if(window._selectedLat && window._selectedLng) {
+      lat = window._selectedLat;
+      lng = window._selectedLng;
+      window._selectedLat = null;
+      window._selectedLng = null;
+    } else {
     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`,{
       headers:{'Accept-Language':'de','User-Agent':'VYBE-App'}
     });
@@ -602,6 +620,7 @@ async function doCreate(){
       // Fallback to map center
       const center = leafMap ? leafMap.getCenter() : {lat:52.510,lng:13.405};
       lat = center.lat; lng = center.lng;
+      } // end else
       notify('Adresse nicht gefunden — Pin in Kartenmitte gesetzt','#ff9f0a');
     }
   } catch(e) {
@@ -668,6 +687,73 @@ function notify(msg,color){
   n.classList.add('show');
   clearTimeout(n._t);
   n._t=setTimeout(()=>n.classList.remove('show'),2500);
+}
+
+
+// ADDRESS AUTOCOMPLETE
+let addrTimer = null;
+let addrCache = {};
+
+function normalizeAddr(str) {
+  return str
+    .replace(/ß/g, 'ss')
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/Ä/g, 'Ae')
+    .replace(/Ö/g, 'Oe')
+    .replace(/Ü/g, 'Ue');
+}
+
+async function addrSearch(val) {
+  const dropdown = document.getElementById('addr-dropdown');
+  if(val.length < 3) { dropdown.style.display = 'none'; return; }
+  
+  clearTimeout(addrTimer);
+  addrTimer = setTimeout(async () => {
+    const normalized = normalizeAddr(val);
+    const cacheKey = normalized.toLowerCase();
+    
+    let results;
+    if(addrCache[cacheKey]) {
+      results = addrCache[cacheKey];
+    } else {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalized)}&limit=5&addressdetails=1`,
+          { headers: {'Accept-Language': 'de', 'User-Agent': 'VYBE-App'} }
+        );
+        results = await res.json();
+        addrCache[cacheKey] = results;
+      } catch(e) { return; }
+    }
+    
+    if(!results.length) { dropdown.style.display = 'none'; return; }
+    
+    dropdown.innerHTML = results.map(r => {
+      const a = r.address || {};
+      const road = a.road || a.pedestrian || a.path || '';
+      const num = a.house_number || '';
+      const city = a.city || a.town || a.village || a.municipality || '';
+      const country = a.country || '';
+      const main = road + (num ? ' ' + num : '') + (city ? ', ' + city : '');
+      const sub = country;
+      const full = r.display_name;
+      return `<div class="addr-option" onclick="selectAddr('${full.replace(/'/g,"\'")}', ${r.lat}, ${r.lon})">
+        <div class="main">${main || r.display_name.split(',')[0]}</div>
+        <div class="sub">${sub}</div>
+      </div>`;
+    }).join('');
+    dropdown.style.display = 'block';
+  }, 350);
+}
+
+function selectAddr(full, lat, lng) {
+  document.getElementById('c-addr').value = full.split(',').slice(0,3).join(',').trim();
+  document.getElementById('addr-dropdown').style.display = 'none';
+  // Store coords for instant use
+  window._selectedLat = parseFloat(lat);
+  window._selectedLng = parseFloat(lng);
 }
 
 window.addEventListener('resize',()=>{if(leafMap)leafMap.invalidateSize();});
