@@ -693,21 +693,46 @@ function notify(msg,color){
 // ADDRESS AUTOCOMPLETE
 let addrTimer = null;
 let addrCache = {};
+let userLat = null, userLng = null;
+
+// Get user location for biasing results
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(p=>{
+    userLat = p.coords.latitude;
+    userLng = p.coords.longitude;
+  },()=>{});
+}
 
 function normalizeAddr(str) {
   return str
-    .replace(/ß/g, 'ss')
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/Ä/g, 'Ae')
-    .replace(/Ö/g, 'Oe')
-    .replace(/Ü/g, 'Ue');
+    .replace(/ß/g,'ss').replace(/ss/gi,'ss')
+    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue')
+    .replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue');
+}
+
+function formatAddr(r) {
+  const a = r.address || {};
+  const road = a.road || a.pedestrian || a.path || a.street || '';
+  const num = a.house_number || '';
+  const city = a.city || a.town || a.village || a.municipality || a.suburb || '';
+  const postcode = a.postcode || '';
+  const country = a.country_code ? a.country_code.toUpperCase() : '';
+  
+  let main = '';
+  if(road) main = road + (num ? ' ' + num : '');
+  else main = r.display_name.split(',')[0];
+  
+  let sub = '';
+  if(postcode && city) sub = postcode + ' ' + city;
+  else if(city) sub = city;
+  if(country && country !== 'DE') sub += (sub ? ' · ' : '') + country;
+  
+  return { main, sub, road, num, city, postcode };
 }
 
 async function addrSearch(val) {
   const dropdown = document.getElementById('addr-dropdown');
-  if(val.length < 3) { dropdown.style.display = 'none'; return; }
+  if(val.length < 2) { dropdown.style.display = 'none'; return; }
   
   clearTimeout(addrTimer);
   addrTimer = setTimeout(async () => {
@@ -719,39 +744,42 @@ async function addrSearch(val) {
       results = addrCache[cacheKey];
     } else {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalized)}&limit=5&addressdetails=1`,
-          { headers: {'Accept-Language': 'de', 'User-Agent': 'VYBE-App'} }
-        );
+        let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalized)}&limit=6&addressdetails=1`;
+        // Bias to user location if available
+        if(userLat && userLng) {
+          url += `&viewbox=${userLng-0.5},${userLat+0.3},${userLng+0.5},${userLat-0.3}&bounded=0`;
+        }
+        const res = await fetch(url, { headers: {'Accept-Language': 'de', 'User-Agent': 'VYBE-App'} });
         results = await res.json();
         addrCache[cacheKey] = results;
       } catch(e) { return; }
     }
     
-    if(!results.length) { dropdown.style.display = 'none'; return; }
+    if(!results.length) {
+      dropdown.innerHTML = '<div class="addr-option"><div class="main" style="color:#555">Keine Ergebnisse</div></div>';
+      dropdown.style.display = 'block';
+      return;
+    }
     
     dropdown.innerHTML = results.map(r => {
-      const a = r.address || {};
-      const road = a.road || a.pedestrian || a.path || '';
-      const num = a.house_number || '';
-      const city = a.city || a.town || a.village || a.municipality || '';
-      const country = a.country || '';
-      const main = road + (num ? ' ' + num : '') + (city ? ', ' + city : '');
-      const sub = country;
-      const full = r.display_name;
-      return `<div class="addr-option" onclick="selectAddr('${full.replace(/'/g,"\'")}', ${r.lat}, ${r.lon})">
-        <div class="main">${main || r.display_name.split(',')[0]}</div>
-        <div class="sub">${sub}</div>
+      const {main, sub} = formatAddr(r);
+      const safeMain = main.replace(/'/g,"&apos;");
+      const safeSub = sub.replace(/'/g,"&apos;");
+      const safeDisplay = r.display_name.replace(/'/g,"\'");
+      return `<div class="addr-option" onclick="selectAddr('${safeDisplay}', ${r.lat}, ${r.lon}, '${safeMain}', '${safeSub}')">
+        <div class="main">${main}</div>
+        ${sub ? `<div class="sub">${sub}</div>` : ''}
       </div>`;
     }).join('');
     dropdown.style.display = 'block';
-  }, 350);
+  }, 300);
 }
 
-function selectAddr(full, lat, lng) {
-  document.getElementById('c-addr').value = full.split(',').slice(0,3).join(',').trim();
+function selectAddr(full, lat, lng, main, sub) {
+  // Show clean address: Straße Nummer, PLZ Stadt
+  const clean = main + (sub ? ', ' + sub : '');
+  document.getElementById('c-addr').value = clean;
   document.getElementById('addr-dropdown').style.display = 'none';
-  // Store coords for instant use
   window._selectedLat = parseFloat(lat);
   window._selectedLng = parseFloat(lng);
 }
