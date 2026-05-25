@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 :root{--red:#ff2d55;--green:#30d158;--purple:#bf5af2;--yellow:#ffd60a;--orange:#ff9f0a;--bg:#000;--s1:#0d0d0d;--s2:#1a1a1a;--border:#222;--muted:#555;}
@@ -459,6 +460,74 @@ textarea.inp{resize:none;min-height:80px;}
 <div id="notif"></div>
 
 <script>
+// SUPABASE
+const SUPABASE_URL = 'https://pqtikhssrvheybqjbfvb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_UauLbLhpUROiQXP_oqT4fw_Sp0dGM2F';
+let supabase = null;
+
+function initSupabase() {
+  try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log('Supabase connected!');
+    loadEvents();
+  } catch(e) {
+    console.log('Supabase init failed, using local data', e);
+  }
+}
+
+async function loadEvents() {
+  if(!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if(error) { console.log('Load error:', error); return; }
+    if(data && data.length > 0) {
+      // Merge with local mock events
+      const dbEvents = data.map(e => ({
+        id: e.id,
+        title: e.title,
+        area: e.area || e.address,
+        type: e.type || 'house',
+        time: (e.date || 'Heute') + ' ' + (e.time || ''),
+        guests: e.guests || 1,
+        maxGuests: e.max_guests || 20,
+        color: e.color || '#ff2d55',
+        hot: e.hot || false,
+        lat: parseFloat(e.lat),
+        lng: parseFloat(e.lng),
+        desc: e.description || '',
+      })).filter(e => e.lat && e.lng);
+      events = [...dbEvents, ...EVENTS];
+      renderMarkers();
+    }
+  } catch(e) { console.log('Load error:', e); }
+}
+
+async function saveEventToDb(ev) {
+  if(!supabase) return;
+  try {
+    const { error } = await supabase.from('events').insert([{
+      title: ev.title,
+      address: ev.area,
+      area: ev.area,
+      type: ev.type,
+      date: ev.time.split(' ')[0] || 'Heute',
+      time: ev.time.split(' ')[1] || '',
+      guests: ev.guests,
+      max_guests: ev.maxGuests,
+      color: ev.color,
+      hot: ev.hot,
+      lat: ev.lat,
+      lng: ev.lng,
+      description: ev.desc,
+    }]);
+    if(error) console.log('Save error:', error);
+    else { notify('Event gespeichert! 🔥', '#30d158'); loadEvents(); }
+  } catch(e) { console.log('Save error:', e); }
+}
+
 const EVENTS = [
   {id:1,title:"Rooftop Rave",area:"Mitte",type:"rave",time:"Heute 22:00",guests:34,maxGuests:60,color:"#ff2d55",hot:true,lat:52.529,lng:13.402,desc:"Rooftop mit Panoramablick. Hartes Techno-Lineup."},
   {id:2,title:"Garden Chill",area:"Prenzlberg",type:"chill",time:"Heute 19:00",guests:12,maxGuests:25,color:"#30d158",hot:false,lat:52.536,lng:13.412,desc:"Gartenparty mit Lichterketten und gutem Wein."},
@@ -485,7 +554,7 @@ function doLogin(){
   document.getElementById('pname').textContent=n;
   document.getElementById('login').classList.remove('active');
   document.getElementById('map-screen').classList.add('active');
-  setTimeout(initMap,100);
+  setTimeout(()=>{ initMap(); initSupabase(); },100);
 }
 document.getElementById('login-name').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
@@ -644,7 +713,8 @@ async function doCreate(){
   createBtn.disabled=false;
   renderMarkers();
   if(leafMap)leafMap.setView([lat,lng],16,{animate:true});
-  notify('Event erstellt! 🎉 Pin gesetzt auf: '+addr,'#30d158');
+  // Save to Supabase
+  saveEventToDb(ev);
 }
 
 // CHAT
