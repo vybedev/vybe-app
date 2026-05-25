@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>VYBE</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --red:#ff2d55;--green:#30d158;--purple:#bf5af2;--yellow:#ffd60a;--orange:#ff9f0a;--blue:#0a84ff;
+  --bg:#000;--s1:#0d0d0d;--s2:#1a1a1a;--s3:#2a2a2a;--border:#222;--muted:#555;
+}
+html,body{height:100%;background:linear-gradient(135deg,#0a0a0a,#111);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;overflow:hidden;}
+
+.phone{width:min(390px,100vw);height:min(844px,100vh);background:#000;border-radius:54px;overflow:hidden;position:relative;box-shadow:0 40px 120px rgba(0,0,0,.9),0 0 0 1px #333;}
+.screen{width:100%;height:100%;overflow:hidden;position:relative;}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:32px;background:#000;border-radius:0 0 18px 18px;z-index:999;}
+.status-bar{position:absolute;top:12px;left:0;right:0;display:flex;justify-content:space-between;padding:0 24px;font-size:11px;font-weight:700;z-index:998;color:#fff;}
+
+/* PAGES */
+.page{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg);animation:fadeIn .3s ease;}
+.page.active{display:flex;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+
+/* SHARED */
+.topbar{padding:48px 20px 10px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.logo{font-family:'Bebas Neue';font-size:26px;letter-spacing:4px;color:var(--red);}
+.scroll{flex:1;overflow-y:auto;scrollbar-width:none;}
+.scroll::-webkit-scrollbar{display:none;}
+
+/* NAV */
+.nav{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.96);border-top:1px solid #1a1a1a;display:flex;padding:8px 0 24px;z-index:100;}
+.nitem{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
+.nitem .ni{font-size:22px;transition:transform .15s;}
+.nitem .nl{font-size:9px;color:var(--muted);letter-spacing:1px;font-weight:700;}
+.nitem.on .nl{color:var(--red);}
+.nitem.on .ni{transform:scale(1.1);}
+
+/* PILLS */
+.pill{background:rgba(0,0,0,.85);border:1px solid #222;border-radius:100px;padding:7px 16px;font-size:11px;color:#888;cursor:pointer;white-space:nowrap;font-weight:700;transition:all .2s;}
+.pill.on{background:var(--red);border-color:var(--red);color:#fff;}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:20px;overflow:hidden;cursor:pointer;transition:transform .1s;}
+.card:active{transform:scale(.98);}
+
+/* MODAL */
+.modal{position:absolute;inset:0;background:#000;z-index:500;display:none;flex-direction:column;animation:slideUp .3s ease;}
+.modal.open{display:flex;}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.modal-top{padding:48px 20px 16px;display:flex;align-items:center;gap:14px;flex-shrink:0;}
+.back{background:var(--s2);border:none;color:#fff;border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;}
+
+/* NOTIF */
+#notif{position:absolute;top:48px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:100px;font-weight:700;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+#notif.show{opacity:1;}
+
+/* ==================== SPLASH ==================== */
+#splash{background:#000;align-items:center;justify-content:center;}
+.splash-v{font-family:'Bebas Neue';font-size:120px;letter-spacing:16px;color:#fff;animation:glitch 3s infinite;line-height:1;}
+.splash-sub{color:#222;font-size:10px;letter-spacing:7px;margin-top:8px;}
+@keyframes glitch{0%,88%,100%{text-shadow:none;transform:none;}90%{text-shadow:-3px 0 var(--red);transform:skewX(-1deg);}92%{text-shadow:3px 0 #0ff;transform:skewX(1deg);}94%{text-shadow:none;transform:none;}}
+
+/* ==================== LOGIN ==================== */
+#login{background:#000;align-items:center;justify-content:center;padding:32px;}
+.login-logo{font-family:'Bebas Neue';font-size:80px;letter-spacing:10px;}
+.login-sub{color:#222;font-size:10px;letter-spacing:5px;margin-bottom:48px;}
+.inp{width:100%;background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:15px 18px;color:#fff;font-size:15px;font-family:'Syne';outline:none;margin-bottom:10px;}
+.inp:focus{border-color:var(--red);}
+.btn{width:100%;border:none;border-radius:14px;padding:17px;color:#fff;font-size:14px;font-weight:800;letter-spacing:2px;cursor:pointer;font-family:'Syne';}
+.btn-r{background:var(--red);}
+.btn-s{background:var(--s1);border:1px solid var(--border);margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:var(--muted);font-size:12px;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ==================== MAP ==================== */
+#map-screen{overflow:hidden;}
+#map-canvas-wrap{flex:1;position:relative;overflow:hidden;background:#080810;}
+canvas#mc{position:absolute;inset:0;}
+.map-ui{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;z-index:10;}
+
+/* Map bottom card */
+#ev-card{position:absolute;bottom:72px;left:12px;right:12px;background:rgba(8,8,16,.97);border:1px solid var(--border);border-radius:22px;padding:16px 18px;z-index:20;display:none;backdrop-filter:blur(20px);}
+#ev-card.show{display:block;animation:slideUp .22s ease;}
+.ec-bar{width:32px;height:3px;background:#333;border-radius:100px;margin:0 auto 12px;}
+.ec-tag{font-size:10px;letter-spacing:3px;margin-bottom:4px;font-weight:700;}
+.ec-name{font-size:21px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px;}
+.ec-meta{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.ec-btns{display:flex;gap:10px;}
+.ec-join{flex:1;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;color:#fff;font-family:'Syne';}
+.ec-x{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;color:#fff;cursor:pointer;}
+
+/* ==================== FEED ==================== */
+.story-row{display:flex;gap:10px;padding:8px 16px 14px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+.story-item{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;cursor:pointer;}
+.story-ring{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid;}
+.story-lbl{font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.5px;}
+
+.post{background:var(--s1);border:1px solid var(--border);border-radius:20px;margin:0 14px 12px;overflow:hidden;}
+.post-head{display:flex;align-items:center;gap:10px;padding:12px 14px 0;}
+.post-ava{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0;}
+.post-nm{font-size:14px;font-weight:700;}
+.post-ev{font-size:11px;color:var(--muted);}
+.post-img{width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;font-size:72px;margin:10px 0;}
+.post-acts{display:flex;gap:14px;padding:0 14px 12px;align-items:center;}
+.act-btn{background:none;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:13px;font-family:'Syne';font-weight:600;transition:transform .15s;}
+.act-btn:active{transform:scale(1.2);}
+.post-cap{padding:0 14px 12px;font-size:13px;color:#999;line-height:1.5;}
+.live-tag{background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;padding:3px 8px;border-radius:100px;margin-left:auto;}
+
+/* ==================== CHAT ==================== */
+.chat-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #111;cursor:pointer;transition:background .15s;}
+.chat-item:active{background:var(--s1);}
+.chat-ava{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0;position:relative;}
+.online-dot{position:absolute;bottom:1px;right:1px;width:12px;height:12px;background:var(--green);border-radius:50%;border:2px solid #000;}
+.chat-nm{font-size:14px;font-weight:700;margin-bottom:3px;}
+.chat-prev{font-size:12px;color:var(--muted);}
+.chat-time{font-size:11px;color:var(--muted);}
+.unread{background:var(--red);color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:100px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.section-lbl{padding:14px 16px 6px;font-size:10px;color:var(--muted);letter-spacing:2px;font-weight:700;}
+
+/* Chat conversation */
+.msg-wrap{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scrollbar-width:none;}
+.msg{max-width:72%;padding:11px 14px;border-radius:18px;font-size:14px;line-height:1.5;}
+.msg.them{background:var(--s2);border-radius:18px 18px 18px 4px;align-self:flex-start;}
+.msg.me{background:var(--red);border-radius:18px 18px 4px 18px;align-self:flex-end;}
+.msg-time{font-size:10px;color:rgba(255,255,255,.4);margin-top:4px;}
+.chat-input-row{padding:12px 14px;display:flex;gap:10px;border-top:1px solid var(--border);flex-shrink:0;}
+.chat-inp{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:100px;padding:11px 16px;color:#fff;font-size:14px;font-family:'Syne';outline:none;}
+.send-btn{background:var(--red);border:none;border-radius:50%;width:42px;height:42px;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;}
+
+/* ==================== PROFILE ==================== */
+.prof-head{padding:48px 20px 16px;text-align:center;}
+.prof-ava{width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--red),var(--purple));display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 10px;border:3px solid #1a1a1a;}
+.prof-name{font-size:22px;font-weight:800;letter-spacing:-.5px;}
+.prof-handle{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.badges{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap;}
+.bdg{background:var(--s2);border:1px solid var(--border);border-radius:100px;padding:5px 12px;font-size:11px;font-weight:700;}
+.bdg.gold{border-color:var(--yellow);color:var(--yellow);}
+.bdg.vip{border-color:var(--purple);color:var(--purple);}
+.bdg.host{border-color:var(--orange);color:var(--orange);}
+.prof-btns{display:flex;gap:8px;}
+.stats-row{display:flex;background:var(--s1);border-radius:18px;margin:0 14px 10px;overflow:hidden;}
+.stat{flex:1;text-align:center;padding:14px 0;border-right:1px solid var(--border);}
+.stat:last-child{border:none;}
+.stat-n{font-size:20px;font-weight:800;}
+.stat-l{font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:2px;}
+
+.section-box{background:var(--s1);border-radius:18px;margin:0 14px 10px;padding:16px;}
+.sec-title{font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:12px;font-weight:700;}
+.ava-items{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.ava-item{width:42px;height:42px;border-radius:12px;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .15s;}
+.ava-item.sel{border-color:var(--red);background:#150005;}
+.ava-item.locked{opacity:.35;}
+.prog-bar-bg{background:var(--s2);border-radius:100px;height:7px;margin-top:8px;overflow:hidden;}
+.prog-bar{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--yellow),var(--orange));}
+
+/* ==================== VIP ==================== */
+.vip-hero{padding:48px 24px 28px;text-align:center;background:linear-gradient(160deg,#0d0020,#1a0035,#080014);position:relative;overflow:hidden;}
+.vip-hero::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 60%,rgba(191,90,242,.25) 0%,transparent 65%);}
+.vip-crown{font-size:56px;margin-bottom:10px;position:relative;z-index:1;}
+.vip-title{font-family:'Bebas Neue';font-size:56px;letter-spacing:6px;color:var(--purple);position:relative;z-index:1;}
+.vip-price{font-size:32px;font-weight:800;position:relative;z-index:1;}
+.vip-price small{font-size:14px;color:var(--muted);font-weight:400;}
+.vip-note{font-size:12px;color:#444;margin-top:4px;position:relative;z-index:1;}
+.vip-feat{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--s1);border:1px solid var(--border);border-radius:16px;margin:0 14px 8px;}
+.vip-feat.hl{border-color:rgba(191,90,242,.4);background:rgba(191,90,242,.07);}
+.vip-feat .fi{font-size:26px;flex-shrink:0;}
+.vip-feat .ft{font-size:14px;font-weight:700;margin-bottom:2px;}
+.vip-feat .fd{font-size:11px;color:var(--muted);}
+.vip-cta{margin:14px 14px 8px;background:linear-gradient(135deg,var(--purple),#6a0dad);border:none;border-radius:16px;padding:18px;color:#fff;font-size:15px;font-weight:800;letter-spacing:2px;cursor:pointer;font-family:'Syne';width:calc(100% - 28px);}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="status-bar"><span>9:41</span><span>●●●● 5G 🔋</span></div>
+  <div class="screen">
+
+  <!-- ===== SPLASH ===== -->
+  <div class="page active" id="splash">
+    <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div class="splash-v">VYBE</div>
+      <div class="splash-sub">FIND YOUR SCENE</div>
+    </div>
+  </div>
+
+  <!-- ===== LOGIN ===== -->
+  <div class="page" id="login">
+    <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;">
+      <div class="login-logo">VYBE</div>
+      <div class="login-sub">FIND YOUR SCENE</div>
+      <input class="inp" id="login-name" placeholder="Dein Name" autocomplete="off"/>
+      <input class="inp" placeholder="E-Mail (optional)"/>
+      <button class="btn btn-r" onclick="doLogin()">EINLOGGEN →</button>
+      <div class="divider">oder</div>
+      <button class="btn btn-s">📸 MIT INSTAGRAM EINLOGGEN</button>
+      <button class="btn btn-s" style="margin-top:8px;">👻 MIT SNAPCHAT EINLOGGEN</button>
+    </div>
+  </div>
+
+  <!-- ===== MAP ===== -->
+  <div class="page" id="map-screen">
+    <div id="map-canvas-wrap">
+      <canvas id="mc"></canvas>
+      <div class="map-ui">
+        <span class="pill on" onclick="mf(this,'Alle')">Alle</span>
+        <span class="pill" onclick="mf(this,'rave')">⚡ Rave</span>
+        <span class="pill" onclick="mf(this,'chill')">🌿 Chill</span>
+        <span class="pill" onclick="mf(this,'house')">🏠 House</span>
+        <span class="pill" onclick="mf(this,'underground')">🖤 Underground</span>
+      </div>
+      <div id="ev-card">
+        <div class="ec-bar"></div>
+        <div class="ec-tag" id="ec-tag"></div>
+        <div class="ec-name" id="ec-name"></div>
+        <div class="ec-meta" id="ec-meta"></div>
+        <div class="ec-btns">
+          <button class="ec-join" id="ec-join" onclick="joinEv()">DABEI →</button>
+          <button class="ec-x" onclick="closeCard()">✕</button>
+        </div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nitem on" onclick="go('map-screen')"><span class="ni">🗺</span><span class="nl">MAP</span></div>
+      <div class="nitem" onclick="go('feed-screen')"><span class="ni">📸</span><span class="nl">FEED</span></div>
+      <div class="nitem" onclick="go('chat-screen')"><span class="ni">💬</span><span class="nl">CHAT</span></div>
+      <div class="nitem" onclick="go('profile-screen')"><span class="ni">👤</span><span class="nl">PROFIL</span></div>
+    </div>
+  </div>
+
+  <!-- ===== FEED ===== -->
+  <div class="page" id="feed-screen">
+    <div class="topbar"><span class="logo">FEED</span><span style="font-size:20px;cursor:pointer">🔔</span></div>
+    <div class="scroll" style="padding-bottom:72px;">
+      <!-- Stories -->
+      <div class="story-row">
+        <div class="story-item"><div class="story-ring" style="border-color:#333;background:var(--s2);">➕</div><div class="story-lbl">DEINE</div></div>
+        <div class="story-item"><div class="story-ring" style="border-color:var(--red);background:#1a0005;">🎤</div><div class="story-lbl">KIRA</div></div>
+        <div class="story-item"><div class="story-ring" style="border-color:var(--green);background:#001a08;">🌿</div><div class="story-lbl">LEA</div></div>
+        <div class="story-item"><div class="story-ring" style="border-color:var(--purple);background:#0d0018;">🖤</div><div class="story-lbl">KOLLEKTIV</div></div>
+        <div class="story-item"><div class="story-ring" style="border-color:var(--yellow);background:#1a1400;">🎉</div><div class="story-lbl">MIA</div></div>
+        <div class="story-item"><div class="story-ring" style="border-color:var(--orange);background:#1a0e00;">🏠</div><div class="story-lbl">TOM</div></div>
+      </div>
+
+      <!-- Post 1 -->
+      <div class="post">
+        <div class="post-head">
+          <div class="post-ava" style="background:#ff2d55;">🎤</div>
+          <div><div class="post-nm">DJ Kira</div><div class="post-ev">📍 Rooftop Rave · Mitte</div></div>
+          <span class="live-tag">🔴 LIVE</span>
+        </div>
+        <div class="post-img" style="background:linear-gradient(135deg,#1a0010,#2d0020);">🎧</div>
+        <div class="post-acts">
+          <button class="act-btn" onclick="like(this,'247')"><span>🔥</span><span>247</span></button>
+          <button class="act-btn"><span>💬</span><span>43</span></button>
+          <button class="act-btn"><span>🔗</span><span>Share</span></button>
+          <span style="margin-left:auto;font-size:10px;color:var(--muted);">2 min</span>
+        </div>
+        <div class="post-cap">Rooftop brennt heute 🔥 Kommt noch!!</div>
+      </div>
+
+      <!-- Post 2 -->
+      <div class="post">
+        <div class="post-head">
+          <div class="post-ava" style="background:#30d158;">🌿</div>
+          <div><div class="post-nm">Lea & Friends</div><div class="post-ev">📍 Garden Chill · Prenzlberg</div></div>
+        </div>
+        <div class="post-img" style="background:linear-gradient(135deg,#001a0c,#002918);">🌿</div>
+        <div class="post-acts">
+          <button class="act-btn" onclick="like(this,'89')"><span>🔥</span><span>89</span></button>
+          <button class="act-btn"><span>💬</span><span>12</span></button>
+          <button class="act-btn"><span>🔗</span><span>Share</span></button>
+          <span style="margin-left:auto;font-size:10px;color:var(--muted);">15 min</span>
+        </div>
+        <div class="post-cap">Abend auf der Terasse ☀️ noch Plätze frei!</div>
+      </div>
+
+      <!-- Post 3 -->
+      <div class="post">
+        <div class="post-head">
+          <div class="post-ava" style="background:#bf5af2;">🖤</div>
+          <div><div class="post-nm">KollektivX</div><div class="post-ev">📍 HAUZ NACHT · Neukölln</div></div>
+          <span class="live-tag" style="background:var(--purple);">👑 VIP</span>
+        </div>
+        <div class="post-img" style="background:linear-gradient(135deg,#100018,#1a0028);">🖤</div>
+        <div class="post-acts">
+          <button class="act-btn" onclick="like(this,'512')"><span>🔥</span><span>512</span></button>
+          <button class="act-btn"><span>💬</span><span>98</span></button>
+          <button class="act-btn"><span>🔗</span><span>Share</span></button>
+          <span style="margin-left:auto;font-size:10px;color:var(--muted);">1h</span>
+        </div>
+        <div class="post-cap">Morgen Nacht. Ihr wisst wo. 👁</div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nitem" onclick="go('map-screen')"><span class="ni">🗺</span><span class="nl">MAP</span></div>
+      <div class="nitem on" onclick="go('feed-screen')"><span class="ni">📸</span><span class="nl">FEED</span></div>
+      <div class="nitem" onclick="go('chat-screen')"><span class="ni">💬</span><span class="nl">CHAT</span></div>
+      <div class="nitem" onclick="go('profile-screen')"><span class="ni">👤</span><span class="nl">PROFIL</span></div>
+    </div>
+  </div>
+
+  <!-- ===== CHAT ===== -->
+  <div class="page" id="chat-screen">
+    <div class="topbar"><span class="logo">CHAT</span><span style="font-size:20px;cursor:pointer">✏️</span></div>
+    <div class="scroll" style="padding-bottom:72px;">
+      <div class="section-lbl">EVENT CHATS</div>
+      <div class="chat-item" onclick="openConvo('Rooftop Rave','⚡ 34 dabei · Live','#ff2d55','⚡')">
+        <div class="chat-ava" style="background:#ff2d55;">⚡<div class="online-dot"></div></div>
+        <div style="flex:1;"><div class="chat-nm">Rooftop Rave</div><div class="chat-prev">DJ Kira: Sound ist krass 🔥</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div class="chat-time">22:14</div><div class="unread">3</div></div>
+      </div>
+      <div class="chat-item" onclick="openConvo('HAUZ NACHT','🖤 89 dabei · Morgen','#bf5af2','🖤')">
+        <div class="chat-ava" style="background:#bf5af2;">🖤<div class="online-dot"></div></div>
+        <div style="flex:1;"><div class="chat-nm">HAUZ NACHT</div><div class="chat-prev">Adresse kommt morgen 👁</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div class="chat-time">21:50</div><div class="unread">12</div></div>
+      </div>
+      <div class="chat-item" onclick="openConvo('Balkon Sunset','🌿 6 dabei · Sa 18:00','#ff9f0a','🌿')">
+        <div class="chat-ava" style="background:#ff9f0a;">🌿</div>
+        <div style="flex:1;"><div class="chat-nm">Balkon Sunset</div><div class="chat-prev">Tom: Bring Wein mit 🍷</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div class="chat-time">18:30</div></div>
+      </div>
+      <div class="section-lbl">DIREKTNACHRICHTEN</div>
+      <div class="chat-item" onclick="openConvo('Lea K.','🌿 Online','#30d158','🌿')">
+        <div class="chat-ava" style="background:#30d158;">🌿<div class="online-dot"></div></div>
+        <div style="flex:1;"><div class="chat-nm">Lea K.</div><div class="chat-prev">Kommst du heute noch? 🌿</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div class="chat-time">20:30</div></div>
+      </div>
+      <div class="chat-item" onclick="openConvo('Mia K.','🎉 Zuletzt 2h','#ffd60a','🎉')">
+        <div class="chat-ava" style="background:#ffd60a;">🎉</div>
+        <div style="flex:1;"><div class="chat-nm">Mia K.</div><div class="chat-prev">Pregame um 20 Uhr!</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;"><div class="chat-time">18:00</div><div class="unread">1</div></div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nitem" onclick="go('map-screen')"><span class="ni">🗺</span><span class="nl">MAP</span></div>
+      <div class="nitem" onclick="go('feed-screen')"><span class="ni">📸</span><span class="nl">FEED</span></div>
+      <div class="nitem on" onclick="go('chat-screen')"><span class="ni">💬</span><span class="nl">CHAT</span></div>
+      <div class="nitem" onclick="go('profile-screen')"><span class="ni">👤</span><span class="nl">PROFIL</span></div>
+    </div>
+  </div>
+
+  <!-- ===== PROFILE ===== -->
+  <div class="page" id="profile-screen">
+    <div class="scroll" style="padding-bottom:72px;">
+      <div class="prof-head">
+        <div class="prof-ava">🎤</div>
+        <div class="prof-name" id="pname">Mert</div>
+        <div class="prof-handle">@mert · <span style="color:var(--purple)">👑 VIP</span></div>
+        <div class="badges">
+          <span class="bdg gold">🥇 GOLD</span>
+          <span class="bdg vip">👑 VIP</span>
+          <span class="bdg host">🎤 HOST</span>
+        </div>
+        <div class="prof-btns">
+          <button style="flex:1;background:var(--red);border:none;border-radius:12px;padding:11px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;">EDIT PROFIL</button>
+          <button style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:11px 14px;color:#fff;font-size:13px;cursor:pointer;" onclick="go('vip-screen')">👑 VIP</button>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><div class="stat-n">23</div><div class="stat-l">EVENTS</div></div>
+        <div class="stat"><div class="stat-n">142</div><div class="stat-l">FREUNDE</div></div>
+        <div class="stat"><div class="stat-n">8</div><div class="stat-l">HOSTED</div></div>
+      </div>
+
+      <div class="section-box">
+        <div class="sec-title">MEIN AVATAR</div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,#1a0020,#2a0040);display:flex;align-items:center;justify-content:center;font-size:32px;border:2px solid var(--border);">🎤</div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">OUTFIT WÄHLEN</div>
+            <div class="ava-items">
+              <div class="ava-item sel" onclick="selAva(this)">🎤</div>
+              <div class="ava-item" onclick="selAva(this)">🧢</div>
+              <div class="ava-item" onclick="selAva(this)">🕶</div>
+              <div class="ava-item" onclick="selAva(this)">⛓</div>
+              <div class="ava-item locked">👑</div>
+              <div class="ava-item locked">💎</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-box">
+        <div class="sec-title">LEVEL & FORTSCHRITT</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:14px;font-weight:700;">🥇 GOLD</span>
+          <span style="font-size:11px;color:var(--muted);">23/50 → 💎 Platin</span>
+        </div>
+        <div class="prog-bar-bg"><div class="prog-bar" style="width:46%;"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">Noch 27 Events bis Platin</div>
+      </div>
+
+      <div style="padding:0 14px 10px;">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:10px;font-weight:700;">MEINE EVENTS</div>
+        <div style="background:var(--s1);border:1px solid #ff2d5522;border-radius:16px;padding:14px;margin-bottom:8px;cursor:pointer;">
+          <div style="font-size:9px;color:var(--red);letter-spacing:2px;margin-bottom:3px;">MITTE · ⚡ RAVE</div>
+          <div style="font-size:16px;font-weight:800;">Rooftop Rave</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">Heute 22:00 · 👥 34/60</div>
+        </div>
+        <div style="background:var(--s1);border:1px solid #30d15822;border-radius:16px;padding:14px;cursor:pointer;">
+          <div style="font-size:9px;color:var(--green);letter-spacing:2px;margin-bottom:3px;">KREUZBERG · 🌿 CHILL</div>
+          <div style="font-size:16px;font-weight:800;">Balkon Sunset</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">Sa 18:00 · 👥 6/15</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nitem" onclick="go('map-screen')"><span class="ni">🗺</span><span class="nl">MAP</span></div>
+      <div class="nitem" onclick="go('feed-screen')"><span class="ni">📸</span><span class="nl">FEED</span></div>
+      <div class="nitem" onclick="go('chat-screen')"><span class="ni">💬</span><span class="nl">CHAT</span></div>
+      <div class="nitem on" onclick="go('profile-screen')"><span class="ni">👤</span><span class="nl">PROFIL</span></div>
+    </div>
+  </div>
+
+  <!-- ===== VIP ===== -->
+  <div class="page" id="vip-screen">
+    <div class="scroll" style="padding-bottom:20px;">
+      <div class="vip-hero">
+        <button style="position:absolute;top:48px;left:18px;background:rgba(255,255,255,.08);border:none;color:#fff;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;z-index:2;" onclick="go('profile-screen')">←</button>
+        <div class="vip-crown">👑</div>
+        <div class="vip-title">VIP</div>
+        <div class="vip-price">5€ <small>/ Monat</small></div>
+        <div class="vip-note">Jederzeit kündbar · Keine Bindung</div>
+      </div>
+
+      <div style="padding:16px 0 0;">
+        <div class="vip-feat hl"><span class="fi">👻</span><div><div class="ft">Ghost Events</div><div class="fd">Komplett unsichtbar — nur per Einladungslink</div></div></div>
+        <div class="vip-feat hl"><span class="fi">🔐</span><div><div class="ft">Private Gruppen Events</div><div class="fd">Nur für ausgewählte Personen sichtbar</div></div></div>
+        <div class="vip-feat"><span class="fi">💎</span><div><div class="ft">Exklusive Avatar Items</div><div class="fd">VIP-only Outfits, Auren & Accessoires</div></div></div>
+        <div class="vip-feat"><span class="fi">🚀</span><div><div class="ft">Event Boost</div><div class="fd">Dein Pin erscheint oben auf der Map</div></div></div>
+        <div class="vip-feat"><span class="fi">📊</span><div><div class="ft">Erweiterte Stats</div><div class="fd">Wer hat dein Event gesehen & gejoint</div></div></div>
+        <div class="vip-feat"><span class="fi">🔗</span><div><div class="ft">Einladungslinks</div><div class="fd">Teile Events privat via WhatsApp & Snap</div></div></div>
+        <button class="vip-cta" onclick="notify('Welcome to VIP! 👑','#bf5af2')">👑 VIP WERDEN — 5€/MONAT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CHAT CONVERSATION MODAL ===== -->
+  <div class="modal" id="convo-modal">
+    <div class="modal-top">
+      <button class="back" onclick="closeModal('convo-modal')">←</button>
+      <div id="convo-ava" style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;"></div>
+      <div>
+        <div style="font-size:16px;font-weight:700;" id="convo-name"></div>
+        <div style="font-size:11px;color:var(--muted);" id="convo-sub"></div>
+      </div>
+    </div>
+    <div class="msg-wrap" id="msg-wrap">
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div id="msg-ava" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;"></div>
+        <div class="msg them">Sound ist krass heute 🔥<div class="msg-time">22:14</div></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-direction:row-reverse;">
+        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--red),var(--purple));display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🎤</div>
+        <div class="msg me">Bin auf dem Weg!! 🏃<div class="msg-time" style="color:rgba(255,255,255,.5);">22:15 ✓✓</div></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div id="msg-ava2" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;"></div>
+        <div class="msg them">Noch 20 Plätze frei 🎉<div class="msg-time">22:16</div></div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input class="chat-inp" placeholder="Nachricht..." id="chat-inp" onkeydown="if(event.key==='Enter')sendMsg()"/>
+      <button class="send-btn" onclick="sendMsg()">→</button>
+    </div>
+  </div>
+
+  <div id="notif"></div>
+  </div><!-- screen -->
+</div><!-- phone -->
+
+<script>
+// ── DATA ──
+const EVENTS = [
+  {id:1,title:"Rooftop Rave",area:"Mitte",type:"rave",time:"Heute 22:00",guests:"34/60",color:"#ff2d55",hot:true,px:.44,py:.30},
+  {id:2,title:"Garden Chill",area:"Prenzlberg",type:"chill",time:"Heute 19:00",guests:"12/25",color:"#30d158",hot:false,px:.65,py:.22},
+  {id:3,title:"HAUZ NACHT",area:"Neukölln",type:"underground",time:"Morgen 00:00",guests:"89/120",color:"#bf5af2",hot:true,px:.58,py:.68},
+  {id:4,title:"Pregame @ Mias",area:"Friedrichshain",type:"house",time:"Sa 20:00",guests:"8/20",color:"#ffd60a",hot:false,px:.74,py:.42},
+  {id:5,title:"Balkon Sunset",area:"Kreuzberg",type:"chill",time:"Sa 18:00",guests:"6/15",color:"#ff9f0a",hot:false,px:.38,py:.55},
+  {id:6,title:"Bass Station",area:"Neukölln",type:"rave",time:"Heute 23:00",guests:"55/80",color:"#ff2d55",hot:true,px:.62,py:.74},
+];
+const TICONS = {rave:"⚡",chill:"🌿",house:"🏠",underground:"🖤"};
+
+let activeEv = null, mapFilter = "Alle", anim = 0, canvas, ctx, W, H;
+let joined = [];
+
+// ── SPLASH ──
+setTimeout(() => {
+  document.getElementById('splash').classList.remove('active');
+  document.getElementById('login').classList.add('active');
+}, 2200);
+
+function doLogin() {
+  const n = document.getElementById('login-name').value.trim() || 'Mert';
+  document.getElementById('pname').textContent = n;
+  document.getElementById('login').classList.remove('active');
+  document.getElementById('map-screen').classList.add('active');
+  setTimeout(initMap, 60);
+}
+document.getElementById('login-name').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// ── NAV ──
+function go(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(page).classList.add('active');
+  document.querySelectorAll('.nitem').forEach(n => n.classList.remove('on'));
+  const navMap = {'map-screen':0,'feed-screen':1,'chat-screen':2,'profile-screen':3,'vip-screen':-1};
+  const idx = navMap[page];
+  if(idx >= 0) document.querySelectorAll('.nitem')[idx].classList.add('on');
+  if(page === 'map-screen' && canvas) { setTimeout(()=>{ resizeCanvas(); }, 60); }
+}
+
+// ── MAP CANVAS ──
+function initMap() {
+  canvas = document.getElementById('mc');
+  resizeCanvas();
+  ctx = canvas.getContext('2d');
+  canvas.addEventListener('click', onMapClick);
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const r = canvas.getBoundingClientRect();
+    handleClick(t.clientX - r.left, t.clientY - r.top);
+  });
+  requestAnimationFrame(drawMap);
+}
+
+function resizeCanvas() {
+  const wrap = document.getElementById('map-canvas-wrap');
+  W = canvas.width = wrap.clientWidth;
+  H = canvas.height = wrap.clientHeight;
+}
+
+function onMapClick(e) {
+  const r = canvas.getBoundingClientRect();
+  handleClick(e.clientX - r.left, e.clientY - r.top);
+}
+
+function handleClick(mx, my) {
+  let hit = null, best = 9999;
+  EVENTS.forEach(ev => {
+    if(mapFilter !== 'Alle' && ev.type !== mapFilter) return;
+    const px = ev.px * W, py = ev.py * H;
+    const d = Math.hypot(mx - px, my - py);
+    if(d < 28 && d < best) { best = d; hit = ev; }
+  });
+  if(hit) showCard(hit);
+  else closeCard();
+}
+
+function drawMap() {
+  if(!canvas || !ctx) { requestAnimationFrame(drawMap); return; }
+  anim += 0.04;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#080810';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid noise texture
+  for(let x = 0; x < W; x += 40) {
+    ctx.strokeStyle = '#0e0e1a';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for(let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Districts
+  const districts = [
+    {pts:[[.28,.15],[.58,.12],[.62,.38],[.52,.44],[.30,.42],[.24,.30]], color:'#111128'},
+    {pts:[[.58,.12],[.82,.14],[.84,.38],[.64,.40],[.62,.38]], color:'#0d1a28'},
+    {pts:[[.52,.44],[.62,.38],[.84,.38],[.82,.60],[.60,.62]], color:'#111128'},
+    {pts:[[.24,.30],[.30,.42],[.52,.44],[.48,.66],[.28,.62],[.18,.48]], color:'#0d1a28'},
+    {pts:[[.38,.62],[.60,.62],[.68,.82],[.46,.86],[.32,.78]], color:'#111128'},
+    {pts:[[.18,.48],[.28,.62],[.22,.76],[.10,.65],[.08,.50]], color:'#0a1520'},
+  ];
+  districts.forEach(d => {
+    ctx.beginPath();
+    d.pts.forEach(([x,y],i) => i ? ctx.lineTo(x*W,y*H) : ctx.moveTo(x*W,y*H));
+    ctx.closePath();
+    ctx.fillStyle = d.color;
+    ctx.fill();
+    ctx.strokeStyle = '#1a1a30';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // Roads
+  const roads = [
+    [[.20,.30],[.50,.20],[.75,.28],[.80,.50],[.72,.72],[.50,.84],[.28,.76],[.16,.55],[.20,.30]],
+    [[.28,.15],[.28,.85]],[[.10,.44],[.90,.44]],[[.52,.10],[.52,.90]],
+    [[.20,.30],[.80,.65]],[[.80,.30],[.25,.75]],
+  ];
+  roads.forEach((r,i) => {
+    ctx.beginPath();
+    r.forEach(([x,y],j) => j ? ctx.lineTo(x*W,y*H) : ctx.moveTo(x*W,y*H));
+    ctx.strokeStyle = i===0 ? '#252540' : '#1a1a30';
+    ctx.lineWidth = i===0 ? 3 : 1.5;
+    ctx.stroke();
+  });
+
+  // Labels
+  if(W > 200) {
+    ctx.font = `${Math.round(9)}px Syne, sans-serif`;
+    ctx.fillStyle = '#2a2a4a';
+    ctx.textAlign = 'center';
+    [['MITTE',.40,.35],['PRENZLBERG',.68,.26],['FRIEDRICHSHAIN',.70,.50],['KREUZBERG',.40,.56],['NEUKÖLLN',.52,.72],['CHARLOTTENBURG',.20,.42]].forEach(([t,x,y]) => ctx.fillText(t,x*W,y*H));
+  }
+
+  // Pins
+  EVENTS.forEach(ev => {
+    if(mapFilter !== 'Alle' && ev.type !== mapFilter) return;
+    const px = ev.px * W, py = ev.py * H;
+    const r = 20, bounce = ev.hot ? Math.sin(anim * 2) * 4 : 0;
+    const isActive = activeEv && activeEv.id === ev.id;
+    const isJoined = joined.includes(ev.id);
+
+    // Pulse ring for hot
+    if(ev.hot) {
+      const pulse = (Math.sin(anim * 2.5) + 1) / 2;
+      ctx.beginPath();
+      ctx.arc(px, py + bounce, r + 6 + pulse * 8, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${ev.color === '#ff2d55' ? '255,45,85' : '191,90,242'},.${Math.round((1-pulse)*4)})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Shadow
+    ctx.beginPath();
+    ctx.arc(px, py + bounce + r * .4, r * .7, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    ctx.fill();
+
+    // Circle
+    ctx.beginPath();
+    ctx.arc(px, py + bounce, r, 0, Math.PI * 2);
+    ctx.fillStyle = ev.color;
+    ctx.fill();
+    if(isActive || isJoined) {
+      ctx.strokeStyle = isJoined ? '#ffffff' : '#ffffff';
+      ctx.lineWidth = isActive ? 3 : 2;
+      ctx.stroke();
+    }
+
+    // Icon
+    ctx.font = `${Math.round(r * .85)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(TICONS[ev.type], px, py + bounce + 1);
+
+    // Hot dot
+    if(ev.hot) {
+      ctx.beginPath();
+      ctx.arc(px + r * .65, py + bounce - r * .65, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff2d55';
+      ctx.fill();
+    }
+  });
+
+  requestAnimationFrame(drawMap);
+}
+
+function showCard(ev) {
+  activeEv = ev;
+  const isIn = joined.includes(ev.id);
+  document.getElementById('ec-tag').textContent = ev.area.toUpperCase() + ' · ' + TICONS[ev.type] + ' ' + ev.type.toUpperCase();
+  document.getElementById('ec-tag').style.color = ev.color;
+  document.getElementById('ec-name').textContent = ev.title;
+  document.getElementById('ec-meta').textContent = '📅 ' + ev.time + '   👥 ' + ev.guests;
+  const btn = document.getElementById('ec-join');
+  btn.textContent = isIn ? 'ABMELDEN' : 'DABEI →';
+  btn.style.background = isIn ? '#1a1a1a' : ev.color;
+  document.getElementById('ev-card').classList.add('show');
+}
+function closeCard() { document.getElementById('ev-card').classList.remove('show'); activeEv = null; }
+function joinEv() {
+  if(!activeEv) return;
+  if(joined.includes(activeEv.id)) {
+    joined = joined.filter(x => x !== activeEv.id);
+    notify('Abgemeldet 👋', '#555');
+  } else {
+    joined.push(activeEv.id);
+    notify('Du bist dabei! 🔥', activeEv.color);
+  }
+  showCard(activeEv);
+}
+function mf(el, filter) {
+  mapFilter = filter;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+  el.classList.add('on');
+  closeCard();
+}
+
+// ── CHAT ──
+function openConvo(name, sub, color, icon) {
+  document.getElementById('convo-name').textContent = name;
+  document.getElementById('convo-sub').textContent = sub;
+  document.getElementById('convo-ava').textContent = icon;
+  document.getElementById('convo-ava').style.background = color;
+  document.getElementById('msg-ava').textContent = icon;
+  document.getElementById('msg-ava').style.background = color;
+  document.getElementById('msg-ava2').textContent = icon;
+  document.getElementById('msg-ava2').style.background = color;
+  document.getElementById('convo-modal').classList.add('open');
+}
+function sendMsg() {
+  const inp = document.getElementById('chat-inp');
+  const txt = inp.value.trim();
+  if(!txt) return;
+  const wrap = document.getElementById('msg-wrap');
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:8px;align-items:flex-end;flex-direction:row-reverse;';
+  div.innerHTML = `<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--red),var(--purple));display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🎤</div><div class="msg me">${txt}<div class="msg-time" style="color:rgba(255,255,255,.5)">Jetzt ✓</div></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  inp.value = '';
+}
+document.getElementById('chat-inp').addEventListener('keydown', e => { if(e.key==='Enter') sendMsg(); });
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── PROFILE ──
+function selAva(el) {
+  if(el.classList.contains('locked')) { notify('🔒 VIP Item — Upgrade nötig!', '#bf5af2'); return; }
+  document.querySelectorAll('.ava-item').forEach(i => i.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// ── FEED ──
+function like(btn, base) {
+  const n = btn.querySelector('span:last-child');
+  const cur = parseInt(n.textContent);
+  n.textContent = cur + 1;
+  btn.style.transform = 'scale(1.3)';
+  setTimeout(() => btn.style.transform = '', 200);
+}
+
+// ── NOTIFY ──
+function notify(msg, color) {
+  const n = document.getElementById('notif');
+  n.textContent = msg;
+  n.style.background = color;
+  n.classList.add('show');
+  clearTimeout(n._t);
+  n._t = setTimeout(() => n.classList.remove('show'), 2500);
+}
+
+window.addEventListener('resize', () => { if(canvas) resizeCanvas(); });
+</script>
+</body>
+</html>
