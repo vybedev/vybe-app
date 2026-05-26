@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 :root{--red:#ff2d55;--green:#30d158;--purple:#bf5af2;--yellow:#ffd60a;--orange:#ff9f0a;--bg:#000;--s1:#0d0d0d;--s2:#1a1a1a;--border:#222;--muted:#555;}
@@ -202,6 +203,9 @@ textarea.inp{resize:none;min-height:80px;}
 .rm-btn.blue{color:#007aff;border-color:#007aff;}
 /* Friend map marker */
 .fmarker{width:36px;height:36px;border-radius:50%;background:#007aff;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 3px 14px rgba(0,0,0,.7);cursor:pointer;}
+/* 3D Globe */
+#globe-wrap{position:absolute;inset:0;display:none;background:radial-gradient(ellipse at center,#05051a 0%,#000 70%);}
+#globe-canvas{width:100%;height:100%;display:block;touch-action:none;}
 </style>
 </head>
 <body>
@@ -237,6 +241,7 @@ textarea.inp{resize:none;min-height:80px;}
       <div class="map-logo">VYBE</div>
       <div style="display:flex;gap:7px;align-items:center;">
         <button id="loc-toggle" onclick="toggleLocationSharing()">📍</button>
+        <button id="globe-toggle" class="map-icon-btn" onclick="toggleGlobe()" title="3D Globus">🌍</button>
         <button class="map-icon-btn notif" onclick="openFriends()" id="friends-btn">👥<span class="badge" id="friends-badge" style="display:none;"></span></button>
         <button class="map-create" onclick="openCreate()">+ CREATE</button>
       </div>
@@ -249,6 +254,7 @@ textarea.inp{resize:none;min-height:80px;}
       <span class="mpill" onclick="setFilter(this,'underground')">🖤 Underground</span>
     </div>
     <div id="leaflet-map"></div>
+    <div id="globe-wrap"><canvas id="globe-canvas"></canvas></div>
     <div id="ev-card">
       <div class="ec-bar"></div>
       <div class="ec-tag" id="ec-tag"></div>
@@ -631,6 +637,7 @@ function subscribeToEvents() {
         markers[ev.id] = m;
       }
       notify('Neues Event: ' + ev.title + ' 📍', ev.color);
+      if(globeActive) renderGlobeMarkers();
     })
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'events' }, ({ old: row }) => {
       if(!row.id) return;
@@ -719,6 +726,9 @@ let events=[], joined=[], activeEv=null, mapFilter="Alle";
 let leafMap=null, markers={}, realtimeChannel=null, cleanupInterval=null;
 let cType="rave", cPriv="public";
 let autoCheckedIn=new Set(), gpsWatchId=null, userMarker=null;
+let globeActive=false, globeRenderer=null, globeScene=null, globeCamera=null;
+let globeGroup=null, globeAnimId=null, globeDragging=false, globeWasDragging=false;
+let globePrevMouse={x:0,y:0};
 let friends=[], friendRequests=[], pendingOutgoing=[];
 let friendLocations={}, friendMarkers={};
 let locationSharing=false, locationBroadcastId=null, locationChannel=null;
@@ -1535,6 +1545,168 @@ async function stopLocationBroadcast() {
   notify('Standort deaktiviert', '#555');
 }
 
+// 3D GLOBE
+function toggleGlobe() {
+  globeActive = !globeActive;
+  document.getElementById('globe-wrap').style.display = globeActive ? 'block' : 'none';
+  document.getElementById('leaflet-map').style.display = globeActive ? 'none' : 'block';
+  const btn = document.getElementById('globe-toggle');
+  btn.textContent = globeActive ? '🗺' : '🌍';
+  btn.style.background = globeActive ? 'rgba(255,45,85,.85)' : '';
+  btn.style.borderColor = globeActive ? 'var(--red)' : '';
+  if (globeActive) { initGlobe(); renderGlobeMarkers(); startGlobeAnim(); }
+  else { stopGlobeAnim(); }
+}
+
+function initGlobe() {
+  if (globeRenderer) return;
+  const canvas = document.getElementById('globe-canvas');
+  const wrap = document.getElementById('globe-wrap');
+  const W = wrap.clientWidth || window.innerWidth;
+  const H = wrap.clientHeight || window.innerHeight;
+
+  globeRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  globeRenderer.setSize(W, H);
+  globeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  globeScene = new THREE.Scene();
+  globeCamera = new THREE.PerspectiveCamera(42, W / H, 0.1, 1000);
+  globeCamera.position.z = 2.6;
+
+  // Stars
+  const starPos = new Float32Array(3000 * 3);
+  for (let i = 0; i < starPos.length; i++) starPos[i] = (Math.random() - 0.5) * 300;
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  globeScene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.7 })));
+
+  // Globe group — Berlin facing camera on start (lng 13.4°)
+  globeGroup = new THREE.Group();
+  globeGroup.rotation.y = -(13.4 * Math.PI / 180);
+  globeScene.add(globeGroup);
+
+  // Sphere
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 64, 64),
+    new THREE.MeshPhongMaterial({ color: 0x080820, emissive: 0x050510, shininess: 25 })
+  );
+  globeGroup.add(sphere);
+
+  // Grid overlay
+  globeGroup.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1.002, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0x1a1a4e, wireframe: true, transparent: true, opacity: 0.12 })
+  ));
+
+  // Atmosphere glow (outer)
+  globeGroup.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1.06, 32, 32),
+    new THREE.MeshPhongMaterial({ color: 0x2244ff, transparent: true, opacity: 0.04, side: THREE.FrontSide })
+  ));
+
+  // Lights
+  globeScene.add(new THREE.AmbientLight(0x334466, 1.2));
+  const sun = new THREE.DirectionalLight(0x8899ff, 1.4);
+  sun.position.set(5, 3, 5);
+  globeScene.add(sun);
+
+  // Touch / mouse
+  canvas.addEventListener('pointerdown', e => {
+    globeDragging = true; globeWasDragging = false;
+    globePrevMouse = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!globeDragging) return;
+    const dx = e.clientX - globePrevMouse.x, dy = e.clientY - globePrevMouse.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) globeWasDragging = true;
+    globeGroup.rotation.y += dx * 0.005;
+    globeGroup.rotation.x = Math.max(-1.4, Math.min(1.4, globeGroup.rotation.x + dy * 0.005));
+    globePrevMouse = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('pointerup', e => { globeDragging = false; if (!globeWasDragging) globePickEvent(e); });
+  canvas.addEventListener('pointerleave', () => { globeDragging = false; });
+}
+
+function latLngTo3D(lat, lng, r) {
+  const phi = (90 - lat) * Math.PI / 180;
+  const theta = (lng + 180) * Math.PI / 180;
+  return new THREE.Vector3(
+    -r * Math.sin(phi) * Math.cos(theta),
+     r * Math.cos(phi),
+     r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function renderGlobeMarkers() {
+  if (!globeGroup) return;
+  // Remove old markers
+  globeGroup.children
+    .filter(c => c.userData.isMarker)
+    .forEach(c => globeGroup.remove(c));
+
+  events.forEach(ev => {
+    if (!ev.lat || !ev.lng) return;
+    const pos = latLngTo3D(ev.lat, ev.lng, 1.012);
+    const col = new THREE.Color(ev.color || '#ff2d55');
+
+    // Core dot
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.016, 10, 10),
+      new THREE.MeshBasicMaterial({ color: col })
+    );
+    dot.position.copy(pos);
+    dot.userData = { isMarker: true, ev };
+    globeGroup.add(dot);
+
+    // Soft halo
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.032, 10, 10),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2 })
+    );
+    halo.position.copy(pos);
+    halo.userData = { isMarker: true };
+    globeGroup.add(halo);
+  });
+}
+
+function globePickEvent(e) {
+  if (!globeRenderer || !globeCamera || !globeGroup) return;
+  const canvas = document.getElementById('globe-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(mouse, globeCamera);
+  ray.params.Points.threshold = 0.02;
+  const hits = ray.intersectObjects(globeGroup.children.filter(c => c.userData.ev));
+  if (hits.length) showCard(hits[0].object.userData.ev);
+}
+
+function startGlobeAnim() {
+  if (globeAnimId) cancelAnimationFrame(globeAnimId);
+  const loop = () => {
+    globeAnimId = requestAnimationFrame(loop);
+    if (!globeDragging) globeGroup.rotation.y += 0.0018;
+    globeRenderer.render(globeScene, globeCamera);
+  };
+  loop();
+}
+
+function stopGlobeAnim() {
+  if (globeAnimId) { cancelAnimationFrame(globeAnimId); globeAnimId = null; }
+}
+
+function resizeGlobe() {
+  if (!globeRenderer || !globeActive) return;
+  const wrap = document.getElementById('globe-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  globeRenderer.setSize(W, H);
+  globeCamera.aspect = W / H;
+  globeCamera.updateProjectionMatrix();
+}
+
 // GPS AUTO CHECK-IN
 function haversine(lat1,lng1,lat2,lng2){
   const R=6371000,toRad=d=>d*Math.PI/180;
@@ -1713,7 +1885,7 @@ function selectAddr(lat, lng, main, sub) {
   window._selectedLng = lng;
 }
 
-window.addEventListener('resize',()=>{if(leafMap)leafMap.invalidateSize();});
+window.addEventListener('resize',()=>{if(leafMap)leafMap.invalidateSize();resizeGlobe();});
 </script>
 </body>
 </html>
