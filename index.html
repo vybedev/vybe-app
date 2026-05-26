@@ -530,9 +530,9 @@ textarea.inp{resize:none;min-height:80px;}
     <button class="back" onclick="closeModal('friends-modal')">✕</button>
   </div>
   <div class="field">
-    <div class="field-lbl">FREUND PER E-MAIL HINZUFÜGEN</div>
+    <div class="field-lbl">FREUND PER USERNAME HINZUFÜGEN</div>
     <div style="display:flex;gap:8px;">
-      <input class="inp" id="friend-email" type="email" placeholder="freund@email.de" style="margin-bottom:0;" onkeydown="if(event.key==='Enter')sendFriendRequest()"/>
+      <input class="inp" id="friend-email" type="text" placeholder="@username" autocomplete="off" style="margin-bottom:0;" onkeydown="if(event.key==='Enter')sendFriendRequest()"/>
       <button style="background:var(--red);border:none;border-radius:14px;padding:0 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;flex-shrink:0;" onclick="sendFriendRequest()">+ ADD</button>
     </div>
   </div>
@@ -1339,11 +1339,11 @@ function renderFriendsModal() {
 }
 
 async function sendFriendRequest() {
-  const emailEl = document.getElementById('friend-email');
-  const email = emailEl.value.trim().toLowerCase();
-  if (!email) return;
-  const { data: profile } = await sb.from('profiles').select('id, display_name').eq('email', email).maybeSingle();
-  if (!profile) { notify('User nicht gefunden 🤷', '#ff9f0a'); return; }
+  const inputEl = document.getElementById('friend-email');
+  const username = inputEl.value.trim().toLowerCase().replace(/^@/, '');
+  if (!username) return;
+  const { data: profile } = await sb.from('profiles').select('id, display_name').eq('username', username).maybeSingle();
+  if (!profile) { notify('@' + username + ' nicht gefunden 🤷', '#ff9f0a'); return; }
   if (profile.id === currentUser.id) { notify('Das bist du selbst 😄', '#ff9f0a'); return; }
   if (friends.some(f => f.id === profile.id) || pendingOutgoing.some(f => f.id === profile.id)) {
     notify('Bereits befreundet oder Anfrage läuft', '#ff9f0a'); return;
@@ -1351,10 +1351,10 @@ async function sendFriendRequest() {
   const { error } = await sb.from('friendships').insert({ requester_id: currentUser.id, addressee_id: profile.id });
   if (error?.code === '23505') { notify('Anfrage bereits gesendet', '#ff9f0a'); return; }
   if (error) { notify('Fehler: ' + error.message, '#ff2d55'); return; }
-  emailEl.value = '';
+  inputEl.value = '';
   await loadFriends();
   renderFriendsModal();
-  notify('Anfrage an ' + esc(profile.display_name || email) + ' gesendet! 👋', '#30d158');
+  notify('Anfrage an ' + esc(profile.display_name || '@' + username) + ' gesendet! 👋', '#30d158');
 }
 
 async function acceptFriendRequest(friendshipId) {
