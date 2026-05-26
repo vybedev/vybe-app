@@ -241,7 +241,6 @@ textarea.inp{resize:none;min-height:80px;}
       <div class="map-logo">VYBE</div>
       <div style="display:flex;gap:7px;align-items:center;">
         <button id="loc-toggle" onclick="toggleLocationSharing()">📍</button>
-        <button id="globe-toggle" class="map-icon-btn" onclick="toggleGlobe()" title="3D Globus">🌍</button>
         <button class="map-icon-btn notif" onclick="openFriends()" id="friends-btn">👥<span class="badge" id="friends-badge" style="display:none;"></span></button>
         <button class="map-create" onclick="openCreate()">+ CREATE</button>
       </div>
@@ -1013,6 +1012,7 @@ function initMap(){
   
   L.control.zoom({position:'bottomright'}).addTo(leafMap);
   leafMap.on('click',()=>closeCard());
+  leafMap.on('zoomend', () => { if (leafMap.getZoom() < 3) showGlobe(); });
   renderMarkers();
   
   // Try GPS
@@ -1060,7 +1060,7 @@ function showCard(ev){
   const isOwner = currentUser && ev.userId && ev.userId === currentUser.id;
   document.getElementById('ec-delete').style.display = isOwner ? 'flex' : 'none';
   document.getElementById('ev-card').classList.add('show');
-  leafMap.panTo([ev.lat,ev.lng],{animate:true,duration:.4});
+  if (leafMap && !globeActive) leafMap.panTo([ev.lat,ev.lng],{animate:true,duration:.4});
 }
 function closeCard(){document.getElementById('ev-card').classList.remove('show');activeEv=null;}
 
@@ -1402,34 +1402,20 @@ async function searchFriend() {
   resultEl.style.display = 'block';
   foundFriendProfile = null;
 
-  console.log('[searchFriend] ── START ──');
-  console.log('[searchFriend] val:', JSON.stringify(val));
-  console.log('[searchFriend] currentUser:', currentUser?.id, currentUser?.email);
-
   let profile = null;
 
-  // Alle Profile laden — zeigt ob Tabelle überhaupt Daten hat
-  const allRes = await sb.from('profiles').select('*').limit(5);
-  console.log('[searchFriend] profiles sample (limit 5):', JSON.stringify(allRes.data), 'error:', JSON.stringify(allRes.error));
-
-  // Username-Suche
   const userRes = await sb.from('profiles')
     .select('id, display_name, username, email, avatar')
     .eq('username', val).maybeSingle();
-  console.log('[searchFriend] byUsername raw:', JSON.stringify(userRes.data), 'error:', JSON.stringify(userRes.error), 'status:', userRes.status);
 
   if (userRes.data) {
     profile = userRes.data;
   } else {
-    // Email-Suche
     const emailRes = await sb.from('profiles')
       .select('id, display_name, username, email, avatar')
       .eq('email', val).maybeSingle();
-    console.log('[searchFriend] byEmail raw:', JSON.stringify(emailRes.data), 'error:', JSON.stringify(emailRes.error), 'status:', emailRes.status);
     profile = emailRes.data;
   }
-
-  console.log('[searchFriend] final profile:', JSON.stringify(profile));
   if (!profile) {
     resultEl.innerHTML = '<div style="color:#ff9f0a;font-size:13px;padding:4px 0;">Niemanden gefunden 🤷</div>';
     return;
@@ -1546,16 +1532,47 @@ async function stopLocationBroadcast() {
 }
 
 // 3D GLOBE
-function toggleGlobe() {
-  globeActive = !globeActive;
-  document.getElementById('globe-wrap').style.display = globeActive ? 'block' : 'none';
-  document.getElementById('leaflet-map').style.display = globeActive ? 'none' : 'block';
-  const btn = document.getElementById('globe-toggle');
-  btn.textContent = globeActive ? '🗺' : '🌍';
-  btn.style.background = globeActive ? 'rgba(255,45,85,.85)' : '';
-  btn.style.borderColor = globeActive ? 'var(--red)' : '';
-  if (globeActive) { initGlobe(); renderGlobeMarkers(); startGlobeAnim(); }
-  else { stopGlobeAnim(); }
+function orientGlobeTo(lat, lng) {
+  if (!globeGroup) return;
+  const target = latLngTo3D(lat, lng, 1).normalize();
+  const forward = new THREE.Vector3(0, 0, 1);
+  globeGroup.setRotationFromQuaternion(
+    new THREE.Quaternion().setFromUnitVectors(target, forward)
+  );
+}
+
+function globeFacingLatLng() {
+  if (!globeGroup) return { lat: 52.51, lng: 13.41 };
+  const local = new THREE.Vector3(0, 0, 1).applyQuaternion(
+    globeGroup.quaternion.clone().invert()
+  );
+  const lat = 90 - Math.acos(Math.max(-1, Math.min(1, local.y))) * 180 / Math.PI;
+  const lng = Math.atan2(local.z, -local.x) * 180 / Math.PI - 180;
+  return { lat, lng };
+}
+
+function showGlobe() {
+  if (globeActive) return;
+  globeActive = true;
+  const center = leafMap ? leafMap.getCenter() : { lat: 52.51, lng: 13.41 };
+  document.getElementById('globe-wrap').style.display = 'block';
+  document.getElementById('leaflet-map').style.display = 'none';
+  initGlobe();
+  orientGlobeTo(center.lat, center.lng);
+  renderGlobeMarkers();
+  startGlobeAnim();
+}
+
+function showLeaflet(lat, lng, zoom) {
+  if (!globeActive) return;
+  globeActive = false;
+  stopGlobeAnim();
+  document.getElementById('globe-wrap').style.display = 'none';
+  document.getElementById('leaflet-map').style.display = 'block';
+  if (leafMap) {
+    leafMap.setView([lat, lng], zoom || 5);
+    setTimeout(() => leafMap.invalidateSize(), 50);
+  }
 }
 
 function initGlobe() {
@@ -1625,6 +1642,40 @@ function initGlobe() {
   });
   canvas.addEventListener('pointerup', e => { globeDragging = false; if (!globeWasDragging) globePickEvent(e); });
   canvas.addEventListener('pointerleave', () => { globeDragging = false; });
+
+  // Wheel: scroll up = zoom into leaflet at current facing location
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      const { lat, lng } = globeFacingLatLng();
+      showLeaflet(lat, lng, 5);
+    }
+  }, { passive: false });
+
+  // Pinch zoom in → back to leaflet
+  let _pinchDist = 0;
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      globeDragging = false;
+      _pinchDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && _pinchDist > 0) {
+      const d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (d - _pinchDist > 30) {
+        _pinchDist = 0;
+        const { lat, lng } = globeFacingLatLng();
+        showLeaflet(lat, lng, 5);
+      }
+    }
+  }, { passive: true });
 }
 
 function latLngTo3D(lat, lng, r) {
@@ -1681,7 +1732,11 @@ function globePickEvent(e) {
   ray.setFromCamera(mouse, globeCamera);
   ray.params.Points.threshold = 0.02;
   const hits = ray.intersectObjects(globeGroup.children.filter(c => c.userData.ev));
-  if (hits.length) showCard(hits[0].object.userData.ev);
+  if (hits.length) {
+    const ev = hits[0].object.userData.ev;
+    showLeaflet(ev.lat, ev.lng, 14);
+    showCard(ev);
+  }
 }
 
 function startGlobeAnim() {
