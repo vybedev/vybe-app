@@ -469,6 +469,23 @@ let currentUser = null;
 
 try {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // Keep session in sync: handles token refresh and server-side sign-out
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' && currentUser) {
+      currentUser = null;
+      events = [...EVENTS];
+      joined = [];
+      if (leafMap) { leafMap.remove(); leafMap = null; markers = {}; }
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('login').classList.add('active');
+      document.getElementById('login-email').value = '';
+      document.getElementById('login-pw').value = '';
+      document.getElementById('auth-error').style.display = 'none';
+    }
+    if (event === 'TOKEN_REFRESHED' && session) {
+      currentUser = session.user;
+    }
+  });
 } catch(e) {
   console.log('Supabase init failed, using local data', e);
 }
