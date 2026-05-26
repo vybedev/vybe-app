@@ -223,6 +223,7 @@ textarea.inp{resize:none;min-height:80px;}
       <div class="ec-tag" id="ec-tag"></div>
       <div class="ec-name" id="ec-name"></div>
       <div class="ec-meta" id="ec-meta"></div>
+      <div id="ec-host" style="font-size:11px;color:var(--muted);margin-bottom:10px;display:none;"></div>
       <div class="ec-btns">
         <button class="ec-join" id="ec-join" onclick="joinEv()">DABEI →</button>
         <button class="ec-x" onclick="closeCard()">✕</button>
@@ -875,6 +876,9 @@ function showCard(ev){
   document.getElementById('ec-tag').style.color=ev.color;
   document.getElementById('ec-name').textContent=ev.title;
   document.getElementById('ec-meta').textContent='📅 '+ev.time+'   👥 '+ev.guests+'/'+ev.maxGuests;
+  const hostEl=document.getElementById('ec-host');
+  if(ev.hostName){hostEl.textContent='🎤 Host: '+ev.hostName;hostEl.style.display='block';}
+  else{hostEl.style.display='none';}
   const btn=document.getElementById('ec-join');
   btn.textContent=isIn?'ABMELDEN':'DABEI →';
   btn.style.background=isIn?'#1a1a1a':ev.color;
