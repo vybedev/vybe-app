@@ -973,31 +973,25 @@ async function doRegister() {
   btn.textContent = 'REGISTRIEREN →';
   btn.disabled = false;
 
+  // Sofort-Login versuchen — unabhängig ob signUp einen Fehler hatte
+  // (SMTP-Fehler beim Email-Senden lässt das Konto trotzdem anlegen)
+  if (data?.session) {
+    afterLogin(data.user);
+    return;
+  }
+
+  const { data: loginData } = await sb.auth.signInWithPassword({ email, password: pw });
+  if (loginData?.session) {
+    afterLogin(loginData.user);
+    return;
+  }
+
+  // Konto wurde wirklich nicht angelegt — echten Fehler zeigen
   if (error) {
     errEl.textContent = error.message === 'User already registered'
       ? 'Diese E-Mail ist bereits registriert.'
       : error.message;
     errEl.style.display = 'block';
-    return;
-  }
-
-  if (data.session) {
-    // Email-Bestätigung deaktiviert — sofort eingeloggt
-    afterLogin(data.user);
-    notify('📧 Bitte E-Mail bestätigen!', '#ff9f0a');
-  } else {
-    // Email-Bestätigung aktiv — sofort einloggen versuchen
-    const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email, password: pw });
-    if (loginData?.session) {
-      afterLogin(loginData.user);
-      notify('📧 Bestätigungs-E-Mail gesendet — bitte bestätigen!', '#ff9f0a');
-    } else {
-      // Supabase blockiert Login vor Bestätigung
-      errEl.style.color = 'var(--green)';
-      errEl.textContent = '✓ Account erstellt! Bitte E-Mail bestätigen und dann einloggen.';
-      errEl.style.display = 'block';
-      showLogin();
-    }
   }
 }
 
