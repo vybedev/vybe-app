@@ -558,6 +558,16 @@ try {
     if (event === 'SIGNED_IN' && session) {
       upsertProfile(session.user);
     }
+    if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at) {
+      currentUser = session.user;
+      if (sb && session.user.id) {
+        sb.from('profiles')
+          .update({ email_verified: true })
+          .eq('id', session.user.id)
+          .then(({ error }) => { if (error) console.error('email_verified update error:', error); });
+      }
+      notify('✅ E-Mail bestätigt!', '#30d158');
+    }
     if (event === 'SIGNED_OUT' && currentUser) {
       stopCleanupSchedule();
       stopGpsWatch(); autoCheckedIn.clear();
@@ -964,17 +974,30 @@ async function doRegister() {
   btn.disabled = false;
 
   if (error) {
-    errEl.textContent = error.message;
+    errEl.textContent = error.message === 'User already registered'
+      ? 'Diese E-Mail ist bereits registriert.'
+      : error.message;
     errEl.style.display = 'block';
     return;
   }
 
   if (data.session) {
+    // Email-Bestätigung deaktiviert — sofort eingeloggt
     afterLogin(data.user);
+    notify('📧 Bitte E-Mail bestätigen!', '#ff9f0a');
   } else {
-    errEl.style.color = 'var(--green)';
-    errEl.textContent = '✓ Bestätigungs-E-Mail gesendet! Bitte Postfach prüfen.';
-    errEl.style.display = 'block';
+    // Email-Bestätigung aktiv — sofort einloggen versuchen
+    const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (loginData?.session) {
+      afterLogin(loginData.user);
+      notify('📧 Bestätigungs-E-Mail gesendet — bitte bestätigen!', '#ff9f0a');
+    } else {
+      // Supabase blockiert Login vor Bestätigung
+      errEl.style.color = 'var(--green)';
+      errEl.textContent = '✓ Account erstellt! Bitte E-Mail bestätigen und dann einloggen.';
+      errEl.style.display = 'block';
+      showLogin();
+    }
   }
 }
 
