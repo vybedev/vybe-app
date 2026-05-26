@@ -155,6 +155,11 @@ html,body{height:100%;background:#111;font-family:'Syne',sans-serif;overflow:hid
 .sel-pill.on{background:var(--red);border-color:var(--red);color:#fff;}
 textarea.inp{resize:none;min-height:80px;}
 
+/* EDIT PROFIL — @-prefix inside input */
+.at-wrap{position:relative;}
+.at-wrap .at-sign{position:absolute;left:18px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;pointer-events:none;}
+.at-wrap .inp{padding-left:30px;}
+
 /* PIN */
 .vpin{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid #000;box-shadow:0 4px 20px rgba(0,0,0,.7);cursor:pointer;}
 .vpin.hot{animation:bop 1.6s ease-in-out infinite;}
@@ -329,9 +334,11 @@ textarea.inp{resize:none;min-height:80px;}
       <div class="prof-ava">🎤</div>
       <div class="prof-name" id="pname">Mert</div>
       <div class="prof-handle"><span id="phandle">@user</span> · <span style="color:var(--purple)">👑 VIP</span></div>
+      <div id="pcity" style="display:none;font-size:11px;color:var(--muted);margin-top:4px;"></div>
+      <div id="pbio" style="display:none;font-size:13px;color:#aaa;margin:8px 0 4px;line-height:1.5;max-width:280px;text-align:center;"></div>
       <div class="badges"><span class="bdg gold">🥇 GOLD</span><span class="bdg vip">👑 VIP</span><span class="bdg host">🎤 HOST</span></div>
       <div style="display:flex;gap:8px;">
-        <button style="flex:1;background:var(--red);border:none;border-radius:12px;padding:11px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;">EDIT PROFIL</button>
+        <button style="flex:1;background:var(--red);border:none;border-radius:12px;padding:11px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;" onclick="openEditProfil()">EDIT PROFIL</button>
         <button style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:11px 14px;color:#fff;font-size:13px;cursor:pointer;" onclick="go('vip-screen')">👑 VIP</button>
       </div>
       <button onclick="doLogout()" style="width:100%;margin-top:8px;background:none;border:1px solid #333;border-radius:12px;padding:11px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:Syne;">AUSLOGGEN</button>
@@ -457,6 +464,31 @@ textarea.inp{resize:none;min-height:80px;}
   </div>
   <div class="field"><div class="field-lbl">BESCHREIBUNG</div><textarea class="inp" id="c-desc" placeholder="Was erwartet die Leute?"></textarea></div>
   <div class="field"><button style="width:100%;background:var(--red);border:none;border-radius:14px;padding:17px;color:#fff;font-size:14px;font-weight:800;letter-spacing:2px;cursor:pointer;font-family:Syne;" onclick="doCreate()">EVENT ERSTELLEN 🎉</button></div>
+</div>
+
+<!-- EDIT PROFIL MODAL -->
+<div class="create-modal" id="edit-modal">
+  <div class="create-top">
+    <span class="create-title">EDIT PROFIL</span>
+    <button class="back" onclick="closeModal('edit-modal')">✕</button>
+  </div>
+  <div class="field"><div class="field-lbl">ANZEIGENAME *</div><input class="inp" id="ep-name" type="text" placeholder="Dein Name" autocomplete="name"/></div>
+  <div class="field">
+    <div class="field-lbl">USERNAME</div>
+    <div class="at-wrap"><span class="at-sign">@</span><input class="inp" id="ep-handle" type="text" placeholder="username" autocomplete="off"/></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:5px;padding-left:2px;">Nur Buchstaben, Zahlen, Unterstriche</div>
+  </div>
+  <div class="field"><div class="field-lbl">BIO</div><textarea class="inp" id="ep-bio" placeholder="Ein paar Worte über dich..." style="resize:none;min-height:72px;"></textarea></div>
+  <div class="field">
+    <div class="field-lbl">GEBURTSTAG</div>
+    <input class="inp" id="ep-birthday" type="date"/>
+    <div style="font-size:10px;color:var(--muted);margin-top:5px;padding-left:2px;">Mindestalter: 16 Jahre</div>
+  </div>
+  <div class="field"><div class="field-lbl">STADT / STANDORT</div><input class="inp" id="ep-city" type="text" placeholder="z.B. Berlin"/></div>
+  <div id="ep-error" style="color:var(--red);font-size:12px;margin:0 18px 10px;display:none;"></div>
+  <div class="field">
+    <button id="ep-save-btn" style="width:100%;background:var(--red);border:none;border-radius:14px;padding:17px;color:#fff;font-size:14px;font-weight:800;letter-spacing:2px;cursor:pointer;font-family:Syne;" onclick="saveProfile()">SPEICHERN ✓</button>
+  </div>
 </div>
 
 <div id="notif"></div>
