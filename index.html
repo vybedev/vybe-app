@@ -530,11 +530,12 @@ textarea.inp{resize:none;min-height:80px;}
     <button class="back" onclick="closeModal('friends-modal')">✕</button>
   </div>
   <div class="field">
-    <div class="field-lbl">FREUND PER USERNAME HINZUFÜGEN</div>
+    <div class="field-lbl">FREUND SUCHEN</div>
     <div style="display:flex;gap:8px;">
-      <input class="inp" id="friend-email" type="text" placeholder="@username" autocomplete="off" style="margin-bottom:0;" onkeydown="if(event.key==='Enter')sendFriendRequest()"/>
-      <button style="background:var(--red);border:none;border-radius:14px;padding:0 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;flex-shrink:0;" onclick="sendFriendRequest()">+ ADD</button>
+      <input class="inp" id="friend-search" type="text" placeholder="@username oder E-Mail" autocomplete="off" style="margin-bottom:0;" oninput="clearFriendResult()" onkeydown="if(event.key==='Enter')searchFriend()"/>
+      <button style="background:var(--red);border:none;border-radius:14px;padding:0 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;flex-shrink:0;" onclick="searchFriend()">SUCHEN</button>
     </div>
+    <div id="friend-result" style="display:none;margin-top:10px;border-top:1px solid #1a1a1a;padding-top:10px;"></div>
   </div>
   <div id="friends-content" style="flex:1;overflow-y:auto;scrollbar-width:none;padding-bottom:40px;"></div>
 </div>
@@ -1338,24 +1339,85 @@ function renderFriendsModal() {
   c.innerHTML = html;
 }
 
-async function sendFriendRequest() {
-  const inputEl = document.getElementById('friend-email');
-  const username = inputEl.value.trim().toLowerCase().replace(/^@/, '');
-  if (!username) return;
-  const { data: profile } = await sb.from('profiles').select('id, display_name').eq('username', username).maybeSingle();
-  if (!profile) { notify('@' + username + ' nicht gefunden 🤷', '#ff9f0a'); return; }
-  if (profile.id === currentUser.id) { notify('Das bist du selbst 😄', '#ff9f0a'); return; }
-  if (friends.some(f => f.id === profile.id) || pendingOutgoing.some(f => f.id === profile.id)) {
-    notify('Bereits befreundet oder Anfrage läuft', '#ff9f0a'); return;
+let foundFriendProfile = null;
+
+function clearFriendResult() {
+  foundFriendProfile = null;
+  const r = document.getElementById('friend-result');
+  if (r) r.style.display = 'none';
+}
+
+async function searchFriend() {
+  const inputEl = document.getElementById('friend-search');
+  const val = inputEl.value.trim().toLowerCase().replace(/^@/, '');
+  const resultEl = document.getElementById('friend-result');
+  if (!val) return;
+
+  resultEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0;">Suche…</div>';
+  resultEl.style.display = 'block';
+  foundFriendProfile = null;
+
+  // Username zuerst, dann E-Mail als Fallback
+  let profile = null;
+  const { data: byUser } = await sb.from('profiles')
+    .select('id, display_name, username, email, avatar')
+    .eq('username', val).maybeSingle();
+  if (byUser) {
+    profile = byUser;
+  } else {
+    const { data: byEmail } = await sb.from('profiles')
+      .select('id, display_name, username, email, avatar')
+      .eq('email', val).maybeSingle();
+    profile = byEmail;
   }
+
+  if (!profile) {
+    resultEl.innerHTML = '<div style="color:#ff9f0a;font-size:13px;padding:4px 0;">Niemanden gefunden 🤷</div>';
+    return;
+  }
+  if (profile.id === currentUser.id) {
+    resultEl.innerHTML = '<div style="color:#ff9f0a;font-size:13px;padding:4px 0;">Das bist du selbst 😄</div>';
+    return;
+  }
+
+  foundFriendProfile = profile;
+  const alreadyFriend = friends.some(f => f.id === profile.id);
+  const alreadyPending = pendingOutgoing.some(f => f.id === profile.id) || friendRequests.some(f => f.id === profile.id);
+  const subline = profile.username ? '@' + esc(profile.username) : esc(profile.email || '');
+
+  let actionHtml = '';
+  if (alreadyFriend) {
+    actionHtml = '<span style="color:var(--green);font-size:12px;font-weight:800;">✓ BEFREUNDET</span>';
+  } else if (alreadyPending) {
+    actionHtml = '<span style="color:var(--muted);font-size:12px;font-weight:700;">Anfrage läuft…</span>';
+  } else {
+    actionHtml = `<button class="req-btn" onclick="confirmFriendRequest()">Anfrage senden</button>`;
+  }
+
+  resultEl.innerHTML = `<div style="display:flex;align-items:center;gap:12px;">
+    <div class="friend-ava">${esc(profile.avatar || '👤')}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="friend-nm">${esc(profile.display_name || 'User')}</div>
+      <div class="friend-sub">${subline}</div>
+    </div>
+    ${actionHtml}
+  </div>`;
+}
+
+async function confirmFriendRequest() {
+  if (!foundFriendProfile) return;
+  const profile = foundFriendProfile;
   const { error } = await sb.from('friendships').insert({ requester_id: currentUser.id, addressee_id: profile.id });
   if (error?.code === '23505') { notify('Anfrage bereits gesendet', '#ff9f0a'); return; }
   if (error) { notify('Fehler: ' + error.message, '#ff2d55'); return; }
-  inputEl.value = '';
+  document.getElementById('friend-search').value = '';
+  clearFriendResult();
   await loadFriends();
   renderFriendsModal();
-  notify('Anfrage an ' + esc(profile.display_name || '@' + username) + ' gesendet! 👋', '#30d158');
+  notify('Anfrage an ' + esc(profile.display_name || '@' + profile.username || 'User') + ' gesendet! 👋', '#30d158');
 }
+
+async function sendFriendRequest() { await searchFriend(); }
 
 async function acceptFriendRequest(friendshipId) {
   await sb.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
