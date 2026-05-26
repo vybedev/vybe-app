@@ -545,6 +545,8 @@ async function loadEvents() {
         lat: parseFloat(e.lat),
         lng: parseFloat(e.lng),
         desc: e.description || '',
+        userId: e.user_id || null,
+        hostName: e.host_name || null,
       })).filter(e => e.lat && e.lng);
       events = [...dbEvents, ...EVENTS];
       renderMarkers();
@@ -570,6 +572,7 @@ async function saveEventToDb(ev) {
       lng: ev.lng,
       description: ev.desc,
       user_id: currentUser?.id || null,
+      host_name: currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || null,
     }]);
     if(error) console.log('Save error:', error);
     else { notify('Event gespeichert! 🔥', '#30d158'); loadEvents(); }
@@ -953,6 +956,8 @@ async function doCreate(){
     color:COLORS[Math.floor(Math.random()*COLORS.length)],hot:false,
     lat, lng,
     desc:document.getElementById('c-desc').value||'',
+    userId: currentUser?.id || null,
+    hostName: currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || null,
   };
   events.unshift(ev);
   joined.push(ev.id);
