@@ -1363,24 +1363,34 @@ async function searchFriend() {
   resultEl.style.display = 'block';
   foundFriendProfile = null;
 
-  // Username zuerst, dann E-Mail als Fallback
-  console.log('[searchFriend] val:', val);
+  console.log('[searchFriend] ── START ──');
+  console.log('[searchFriend] val:', JSON.stringify(val));
+  console.log('[searchFriend] currentUser:', currentUser?.id, currentUser?.email);
+
   let profile = null;
-  const { data: byUser, error: errUser } = await sb.from('profiles')
+
+  // Alle Profile laden — zeigt ob Tabelle überhaupt Daten hat
+  const allRes = await sb.from('profiles').select('*').limit(5);
+  console.log('[searchFriend] profiles sample (limit 5):', JSON.stringify(allRes.data), 'error:', JSON.stringify(allRes.error));
+
+  // Username-Suche
+  const userRes = await sb.from('profiles')
     .select('id, display_name, username, email, avatar')
     .eq('username', val).maybeSingle();
-  console.log('[searchFriend] byUsername:', byUser, 'error:', errUser);
-  if (byUser) {
-    profile = byUser;
+  console.log('[searchFriend] byUsername raw:', JSON.stringify(userRes.data), 'error:', JSON.stringify(userRes.error), 'status:', userRes.status);
+
+  if (userRes.data) {
+    profile = userRes.data;
   } else {
-    const { data: byEmail, error: errEmail } = await sb.from('profiles')
+    // Email-Suche
+    const emailRes = await sb.from('profiles')
       .select('id, display_name, username, email, avatar')
       .eq('email', val).maybeSingle();
-    console.log('[searchFriend] byEmail:', byEmail, 'error:', errEmail);
-    profile = byEmail;
+    console.log('[searchFriend] byEmail raw:', JSON.stringify(emailRes.data), 'error:', JSON.stringify(emailRes.error), 'status:', emailRes.status);
+    profile = emailRes.data;
   }
 
-  console.log('[searchFriend] final profile:', profile);
+  console.log('[searchFriend] final profile:', JSON.stringify(profile));
   if (!profile) {
     resultEl.innerHTML = '<div style="color:#ff9f0a;font-size:13px;padding:4px 0;">Niemanden gefunden 🤷</div>';
     return;
