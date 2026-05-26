@@ -507,6 +507,7 @@ try {
   // Keep session in sync: handles token refresh and server-side sign-out
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' && currentUser) {
+      if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
       currentUser = null;
       events = [];
       joined = [];
@@ -525,6 +526,25 @@ try {
   console.log('Supabase init failed, using local data', e);
 }
 
+function mapRow(e) {
+  return {
+    id: e.id,
+    title: e.title,
+    area: e.area || e.address,
+    type: e.type || 'house',
+    time: (e.date || 'Heute') + ' ' + (e.time || ''),
+    guests: e.guests || 1,
+    maxGuests: e.max_guests || 20,
+    color: e.color || '#ff2d55',
+    hot: e.hot || false,
+    lat: parseFloat(e.lat),
+    lng: parseFloat(e.lng),
+    desc: e.description || '',
+    userId: e.user_id || null,
+    hostName: e.host_name || null,
+  };
+}
+
 async function loadEvents() {
   if(!sb) return;
   try {
@@ -533,24 +553,37 @@ async function loadEvents() {
       .select('*')
       .order('created_at', { ascending: false });
     if(error) { console.log('Load error:', error); return; }
-    events = (data || []).map(e => ({
-      id: e.id,
-      title: e.title,
-      area: e.area || e.address,
-      type: e.type || 'house',
-      time: (e.date || 'Heute') + ' ' + (e.time || ''),
-      guests: e.guests || 1,
-      maxGuests: e.max_guests || 20,
-      color: e.color || '#ff2d55',
-      hot: e.hot || false,
-      lat: parseFloat(e.lat),
-      lng: parseFloat(e.lng),
-      desc: e.description || '',
-      userId: e.user_id || null,
-      hostName: e.host_name || null,
-    })).filter(e => e.lat && e.lng);
+    events = (data || []).map(mapRow).filter(e => e.lat && e.lng);
     renderMarkers();
   } catch(e) { console.log('Load error:', e); }
+}
+
+function subscribeToEvents() {
+  if(!sb || !leafMap) return;
+  if(realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+
+  realtimeChannel = sb.channel('public:events')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, ({ new: row }) => {
+      // Skip own inserts — already in local state from doCreate
+      if(row.user_id === currentUser?.id) return;
+      const ev = mapRow(row);
+      if(!ev.lat || !ev.lng) return;
+      if(events.find(e => e.id === ev.id)) return;
+      events.unshift(ev);
+      if(leafMap && (mapFilter === 'Alle' || ev.type === mapFilter)) {
+        const m = L.marker([ev.lat, ev.lng], {icon: makeIcon(ev)}).addTo(leafMap);
+        m.on('click', e => { e.originalEvent?.stopPropagation(); showCard(ev); });
+        markers[ev.id] = m;
+      }
+      notify('Neues Event: ' + ev.title + ' 📍', ev.color);
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'events' }, ({ old: row }) => {
+      if(!row.id) return;
+      if(markers[row.id]) { leafMap.removeLayer(markers[row.id]); delete markers[row.id]; }
+      events = events.filter(e => e.id !== row.id);
+      if(activeEv?.id === row.id) closeCard();
+    })
+    .subscribe();
 }
 
 async function saveEventToDb(ev) {
@@ -589,7 +622,7 @@ const TICONS={rave:"⚡",chill:"🌿",house:"🏠",underground:"🖤"};
 const COLORS=["#ff2d55","#bf5af2","#30d158","#ffd60a","#ff9f0a"];
 
 let events=[], joined=[], activeEv=null, mapFilter="Alle";
-let leafMap=null, markers={};
+let leafMap=null, markers={}, realtimeChannel=null;
 let cType="rave", cPriv="public";
 
 // SPLASH — check for existing session, skip login if already authenticated
@@ -621,10 +654,11 @@ function afterLogin(user) {
   applyProfileDisplay(user);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('map-screen').classList.add('active');
-  setTimeout(() => { initMap(); loadEvents(); }, 100);
+  setTimeout(() => { initMap(); loadEvents().then(() => subscribeToEvents()); }, 100);
 }
 
 async function doLogout() {
+  if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (sb) await sb.auth.signOut();
   currentUser = null;
   events = [];
