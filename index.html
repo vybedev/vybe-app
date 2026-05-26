@@ -554,6 +554,9 @@ try {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   // Keep session in sync: handles token refresh and server-side sign-out
   sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      upsertProfile(session.user);
+    }
     if (event === 'SIGNED_OUT' && currentUser) {
       stopCleanupSchedule();
       stopGpsWatch(); autoCheckedIn.clear();
@@ -1181,14 +1184,17 @@ function notify(msg,color){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 async function upsertProfile(user) {
-  if (!sb) return;
+  if (!sb || !user?.id) return;
   const meta = user.user_metadata || {};
-  await sb.from('profiles').upsert({
-    id: user.id, email: user.email,
+  const { error } = await sb.from('profiles').upsert({
+    id: user.id,
+    email: user.email,
     display_name: meta.name || user.email?.split('@')[0] || 'User',
-    username: meta.username || null, avatar: '🎤',
+    username: meta.username || null,
+    avatar: '🎤',
     updated_at: new Date().toISOString()
   }, { onConflict: 'id' });
+  if (error) console.error('upsertProfile error:', error.message, error);
 }
 
 async function loadFriends() {
