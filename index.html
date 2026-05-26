@@ -1524,11 +1524,23 @@ function startGpsWatch(){
 function stopGpsWatch(){
   if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
   if(userMarker&&leafMap){leafMap.removeLayer(userMarker);userMarker=null;}
+  lastGpsLat=null; lastGpsLng=null;
 }
+
+let lastGpsLat=null, lastGpsLng=null;
+const GPS_MOVE_THRESHOLD=5; // Meter
 
 function onGpsUpdate(pos){
   const{latitude:lat,longitude:lng}=pos.coords;
+
+  // Smoothing: ignoriere Update wenn Bewegung < 5m
+  if(lastGpsLat!==null){
+    const moved=haversine(lastGpsLat,lastGpsLng,lat,lng);
+    if(moved<GPS_MOVE_THRESHOLD) return;
+  }
+  lastGpsLat=lat; lastGpsLng=lng;
   userLat=lat; userLng=lng;
+
   // Update blue dot on map
   if(leafMap){
     if(!userMarker){
