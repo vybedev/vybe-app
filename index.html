@@ -176,6 +176,13 @@ textarea.inp{resize:none;min-height:80px;}
 .addr-option:hover,.addr-option:active{background:#1a1a1a;color:#fff;}
 .addr-option .main{font-weight:700;color:#fff;margin-bottom:2px;}
 .addr-option .sub{font-size:11px;color:#555;}
+
+/* GPS User Dot */
+.user-dot{width:16px;height:16px;border-radius:50%;background:#007aff;border:3px solid #fff;box-shadow:0 0 0 0 rgba(0,122,255,.4);animation:gpsPulse 2s infinite;}
+@keyframes gpsPulse{0%{box-shadow:0 0 0 0 rgba(0,122,255,.5);}70%{box-shadow:0 0 0 14px rgba(0,122,255,0);}100%{box-shadow:0 0 0 0 rgba(0,122,255,0);}}
+/* Auto-Checkin Banner */
+#checkin-banner{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;border-radius:20px;padding:11px 22px;font-size:13px;font-weight:800;letter-spacing:1px;z-index:9998;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;font-family:'Syne';display:flex;align-items:center;gap:8px;}
+#checkin-banner.show{opacity:1;}
 </style>
 </head>
 <body>
@@ -494,6 +501,7 @@ textarea.inp{resize:none;min-height:80px;}
 </div>
 
 <div id="notif"></div>
+<div id="checkin-banner"></div>
 
 <script>
 // SUPABASE
@@ -508,6 +516,7 @@ try {
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' && currentUser) {
       stopCleanupSchedule();
+      stopGpsWatch(); autoCheckedIn.clear();
       if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
       currentUser = null;
       events = [];
@@ -584,6 +593,18 @@ function subscribeToEvents() {
       events = events.filter(e => e.id !== row.id);
       if(activeEv?.id === row.id) closeCard();
     })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, ({ new: row }) => {
+      if(!row.id) return;
+      events = events.map(e => e.id === row.id ? { ...e, guests: row.guests } : e);
+      if(activeEv?.id === row.id) {
+        activeEv = { ...activeEv, guests: row.guests };
+        document.getElementById('ec-meta').textContent = '📅 ' + activeEv.time + '   👥 ' + activeEv.guests + '/' + activeEv.maxGuests;
+      }
+      if(markers[row.id]) {
+        const ev = events.find(e => e.id === row.id);
+        if(ev) markers[row.id].setIcon(makeIcon(ev));
+      }
+    })
     .subscribe();
 }
 
@@ -652,6 +673,7 @@ const COLORS=["#ff2d55","#bf5af2","#30d158","#ffd60a","#ff9f0a"];
 let events=[], joined=[], activeEv=null, mapFilter="Alle";
 let leafMap=null, markers={}, realtimeChannel=null, cleanupInterval=null;
 let cType="rave", cPriv="public";
+let autoCheckedIn=new Set(), gpsWatchId=null, userMarker=null;
 
 // SPLASH — check for existing session, skip login if already authenticated
 setTimeout(async () => {
@@ -682,11 +704,12 @@ function afterLogin(user) {
   applyProfileDisplay(user);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('map-screen').classList.add('active');
-  setTimeout(() => { initMap(); loadEvents().then(() => { subscribeToEvents(); startCleanupSchedule(); }); }, 100);
+  setTimeout(() => { initMap(); loadEvents().then(() => { subscribeToEvents(); startCleanupSchedule(); startGpsWatch(); }); }, 100);
 }
 
 async function doLogout() {
   stopCleanupSchedule();
+  stopGpsWatch(); autoCheckedIn.clear();
   if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (sb) await sb.auth.signOut();
   currentUser = null;
@@ -965,19 +988,26 @@ async function deleteEv(){
   closeCard();
   notify('Event gelöscht','#555');
 }
-function joinEv(){
+async function joinEv(){
   if(!activeEv) return;
-  if(joined.includes(activeEv.id)){
-    joined=joined.filter(x=>x!==activeEv.id);
-    events=events.map(e=>e.id===activeEv.id?{...e,guests:e.guests-1}:e);
+  const evId = activeEv.id;
+  if(joined.includes(evId)){
+    joined=joined.filter(x=>x!==evId);
+    autoCheckedIn.delete(evId);
+    events=events.map(e=>e.id===evId?{...e,guests:Math.max(0,e.guests-1)}:e);
     notify('Abgemeldet 👋','#555');
   } else {
-    joined.push(activeEv.id);
-    events=events.map(e=>e.id===activeEv.id?{...e,guests:e.guests+1}:e);
+    joined.push(evId);
+    autoCheckedIn.add(evId);
+    events=events.map(e=>e.id===evId?{...e,guests:e.guests+1}:e);
     notify('Du bist dabei! 🔥',activeEv.color);
   }
   renderMarkers();
-  showCard(events.find(e=>e.id===activeEv.id));
+  const updated=events.find(e=>e.id===evId);
+  if(updated) showCard(updated);
+  if(sb && updated) {
+    await sb.from('events').update({guests:updated.guests}).eq('id',evId);
+  }
 }
 function setFilter(el,f){
   mapFilter=f;
@@ -1096,6 +1126,69 @@ function notify(msg,color){
   n._t=setTimeout(()=>n.classList.remove('show'),2500);
 }
 
+
+// GPS AUTO CHECK-IN
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000,toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function startGpsWatch(){
+  if(!navigator.geolocation) return;
+  gpsWatchId=navigator.geolocation.watchPosition(onGpsUpdate,()=>{},{
+    enableHighAccuracy:true,maximumAge:10000,timeout:20000
+  });
+}
+
+function stopGpsWatch(){
+  if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
+  if(userMarker&&leafMap){leafMap.removeLayer(userMarker);userMarker=null;}
+}
+
+function onGpsUpdate(pos){
+  const{latitude:lat,longitude:lng}=pos.coords;
+  userLat=lat; userLng=lng;
+  // Update blue dot on map
+  if(leafMap){
+    if(!userMarker){
+      const dot=document.createElement('div');dot.className='user-dot';
+      userMarker=L.marker([lat,lng],{
+        icon:L.divIcon({html:dot,className:'',iconSize:[16,16],iconAnchor:[8,8]}),
+        zIndexOffset:1000,interactive:false
+      }).addTo(leafMap);
+    } else {
+      userMarker.setLatLng([lat,lng]);
+    }
+  }
+  // Check proximity to all events
+  events.forEach(ev=>{
+    if(autoCheckedIn.has(ev.id)||joined.includes(ev.id)){
+      autoCheckedIn.add(ev.id); return;
+    }
+    if(haversine(lat,lng,ev.lat,ev.lng)<=50) autoCheckin(ev);
+  });
+}
+
+async function autoCheckin(ev){
+  autoCheckedIn.add(ev.id);
+  joined.push(ev.id);
+  events=events.map(e=>e.id===ev.id?{...e,guests:e.guests+1}:e);
+  renderMarkers();
+  const updated=events.find(e=>e.id===ev.id);
+  if(activeEv?.id===ev.id&&updated) showCard(updated);
+  // Show check-in banner
+  const banner=document.getElementById('checkin-banner');
+  banner.textContent='📍 Auto Check-in: '+ev.title;
+  banner.classList.add('show');
+  clearTimeout(banner._t);
+  banner._t=setTimeout(()=>banner.classList.remove('show'),3500);
+  // Persist to DB
+  if(sb&&updated){
+    await sb.from('events').update({guests:updated.guests}).eq('id',ev.id);
+  }
+}
 
 // ADDRESS AUTOCOMPLETE
 let addrTimer = null;
