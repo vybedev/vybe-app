@@ -558,16 +558,6 @@ try {
     if (event === 'SIGNED_IN' && session) {
       upsertProfile(session.user);
     }
-    if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at) {
-      currentUser = session.user;
-      if (sb && session.user.id) {
-        sb.from('profiles')
-          .update({ email_verified: true })
-          .eq('id', session.user.id)
-          .then(({ error }) => { if (error) console.error('email_verified update error:', error); });
-      }
-      notify('✅ E-Mail bestätigt!', '#30d158');
-    }
     if (event === 'SIGNED_OUT' && currentUser) {
       stopCleanupSchedule();
       stopGpsWatch(); autoCheckedIn.clear();
@@ -973,26 +963,15 @@ async function doRegister() {
   btn.textContent = 'REGISTRIEREN →';
   btn.disabled = false;
 
-  // Sofort-Login versuchen — unabhängig ob signUp einen Fehler hatte
-  // (SMTP-Fehler beim Email-Senden lässt das Konto trotzdem anlegen)
-  if (data?.session) {
-    afterLogin(data.user);
-    return;
-  }
-
-  const { data: loginData } = await sb.auth.signInWithPassword({ email, password: pw });
-  if (loginData?.session) {
-    afterLogin(loginData.user);
-    return;
-  }
-
-  // Konto wurde wirklich nicht angelegt — echten Fehler zeigen
   if (error) {
     errEl.textContent = error.message === 'User already registered'
       ? 'Diese E-Mail ist bereits registriert.'
       : error.message;
     errEl.style.display = 'block';
+    return;
   }
+
+  afterLogin(data.user);
 }
 
 document.getElementById('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
