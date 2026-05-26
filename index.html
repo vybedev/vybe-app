@@ -507,6 +507,7 @@ try {
   // Keep session in sync: handles token refresh and server-side sign-out
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' && currentUser) {
+      stopCleanupSchedule();
       if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
       currentUser = null;
       events = [];
@@ -586,6 +587,33 @@ function subscribeToEvents() {
     .subscribe();
 }
 
+async function cleanupOldEvents() {
+  if(!sb) return;
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from('events')
+    .delete()
+    .lt('created_at', cutoff)
+    .select('id');
+  if(error) { console.log('Cleanup error:', error); return; }
+  if(!data || data.length === 0) return;
+  const deletedIds = new Set(data.map(r => r.id));
+  deletedIds.forEach(id => {
+    if(markers[id]) { leafMap?.removeLayer(markers[id]); delete markers[id]; }
+  });
+  events = events.filter(e => !deletedIds.has(e.id));
+  if(activeEv && deletedIds.has(activeEv.id)) closeCard();
+}
+
+function startCleanupSchedule() {
+  cleanupOldEvents();
+  cleanupInterval = setInterval(cleanupOldEvents, 30 * 60 * 1000);
+}
+
+function stopCleanupSchedule() {
+  if(cleanupInterval) { clearInterval(cleanupInterval); cleanupInterval = null; }
+}
+
 async function saveEventToDb(ev) {
   if(!sb) return;
   try {
@@ -622,7 +650,7 @@ const TICONS={rave:"⚡",chill:"🌿",house:"🏠",underground:"🖤"};
 const COLORS=["#ff2d55","#bf5af2","#30d158","#ffd60a","#ff9f0a"];
 
 let events=[], joined=[], activeEv=null, mapFilter="Alle";
-let leafMap=null, markers={}, realtimeChannel=null;
+let leafMap=null, markers={}, realtimeChannel=null, cleanupInterval=null;
 let cType="rave", cPriv="public";
 
 // SPLASH — check for existing session, skip login if already authenticated
@@ -654,10 +682,11 @@ function afterLogin(user) {
   applyProfileDisplay(user);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('map-screen').classList.add('active');
-  setTimeout(() => { initMap(); loadEvents().then(() => subscribeToEvents()); }, 100);
+  setTimeout(() => { initMap(); loadEvents().then(() => { subscribeToEvents(); startCleanupSchedule(); }); }, 100);
 }
 
 async function doLogout() {
+  stopCleanupSchedule();
   if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (sb) await sb.auth.signOut();
   currentUser = null;
