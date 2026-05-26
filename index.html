@@ -581,8 +581,8 @@ async function saveEventToDb(ev) {
     if(data?.id) {
       const dbId = data.id;
       events = events.map(e => e.id === ev.id ? {...e, id: dbId} : e);
-      if(markers[ev.id]) { markers[dbId] = markers[ev.id]; delete markers[ev.id]; }
       joined = joined.map(x => x === ev.id ? dbId : x);
+      renderMarkers(); // rebuild click-handler closures with the real UUID
     }
     notify('Event gespeichert! 🔥', '#30d158');
   } catch(e) { console.log('Save error:', e); }
