@@ -188,12 +188,12 @@ textarea.inp{resize:none;min-height:80px;}
   <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;">
     <div class="login-logo">VYBE</div>
     <div class="login-sub">FIND YOUR SCENE</div>
-    <input class="inp" id="login-name" placeholder="Dein Name" autocomplete="off"/>
-    <input class="inp" placeholder="E-Mail (optional)"/>
-    <button class="btn-r" onclick="doLogin()">EINLOGGEN →</button>
-    <div class="divider">oder</div>
-    <button class="btn-s">📸 MIT INSTAGRAM</button>
-    <button class="btn-s">👻 MIT SNAPCHAT</button>
+    <div id="auth-error" style="color:var(--red);font-size:12px;margin-bottom:12px;text-align:center;display:none;width:100%;"></div>
+    <input class="inp" id="login-email" type="email" placeholder="E-Mail" autocomplete="email"/>
+    <input class="inp" id="login-pw" type="password" placeholder="Passwort" autocomplete="current-password"/>
+    <button class="btn-r" id="login-btn" onclick="doLogin()">EINLOGGEN →</button>
+    <div class="divider">neu hier?</div>
+    <button class="btn-s" id="register-btn" onclick="doRegister()">ACCOUNT ERSTELLEN</button>
   </div>
 </div>
 
@@ -464,15 +464,12 @@ textarea.inp{resize:none;min-height:80px;}
 const SUPABASE_URL = 'https://pqtikhssrvheybqjbfvb.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxdGlraHNzcnZoZXlicWpiZnZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTY3NjgsImV4cCI6MjA5NTI3Mjc2OH0.YcLxi8ryz7tehgTWqXlqnhGACWYdIa1HWDfZq72nV0M';
 let sb = null;
+let currentUser = null;
 
-function initSupabase() {
-  try {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    console.log('Supabase connected!');
-    loadEvents();
-  } catch(e) {
-    console.log('Supabase init failed, using local data', e);
-  }
+try {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+  console.log('Supabase init failed, using local data', e);
 }
 
 async function loadEvents() {
@@ -484,7 +481,6 @@ async function loadEvents() {
       .order('created_at', { ascending: false });
     if(error) { console.log('Load error:', error); return; }
     if(data && data.length > 0) {
-      // Merge with local mock events
       const dbEvents = data.map(e => ({
         id: e.id,
         title: e.title,
@@ -522,6 +518,7 @@ async function saveEventToDb(ev) {
       lat: ev.lat,
       lng: ev.lng,
       description: ev.desc,
+      user_id: currentUser?.id || null,
     }]);
     if(error) console.log('Save error:', error);
     else { notify('Event gespeichert! 🔥', '#30d158'); loadEvents(); }
@@ -543,20 +540,100 @@ let events=[...EVENTS], joined=[], activeEv=null, mapFilter="Alle";
 let leafMap=null, markers={};
 let cType="rave", cPriv="public";
 
-// SPLASH
-setTimeout(()=>{
+// SPLASH — check for existing session, skip login if already authenticated
+setTimeout(async () => {
   document.getElementById('splash').classList.remove('active');
+  if (sb) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) { afterLogin(session.user); return; }
+    } catch(e) {}
+  }
   document.getElementById('login').classList.add('active');
-},2200);
+}, 2200);
 
-function doLogin(){
-  const n=document.getElementById('login-name').value.trim()||'Mert';
-  document.getElementById('pname').textContent=n;
-  document.getElementById('login').classList.remove('active');
+function afterLogin(user) {
+  currentUser = user;
+  const name = user.user_metadata?.name || user.email?.split('@')[0] || 'Mert';
+  document.getElementById('pname').textContent = name;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('map-screen').classList.add('active');
-  setTimeout(()=>{ initMap(); initSupabase(); },100);
+  setTimeout(() => { initMap(); loadEvents(); }, 100);
 }
-document.getElementById('login-name').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  errEl.style.color = 'var(--red)';
+
+  if (!email || !pw) {
+    errEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('login-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  btn.textContent = 'EINLOGGEN →';
+  btn.disabled = false;
+
+  if (error) {
+    errEl.textContent = error.message === 'Invalid login credentials'
+      ? 'E-Mail oder Passwort falsch.'
+      : error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+  afterLogin(data.user);
+}
+
+async function doRegister() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  errEl.style.color = 'var(--red)';
+
+  if (!email || !pw) {
+    errEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (pw.length < 6) {
+    errEl.textContent = 'Passwort muss mindestens 6 Zeichen haben.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('register-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  const { data, error } = await sb.auth.signUp({ email, password: pw });
+  btn.textContent = 'ACCOUNT ERSTELLEN';
+  btn.disabled = false;
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  if (data.session) {
+    afterLogin(data.user);
+  } else {
+    errEl.style.color = 'var(--green)';
+    errEl.textContent = '✓ Bestätigungs-E-Mail gesendet! Bitte Postfach prüfen.';
+    errEl.style.display = 'block';
+  }
+}
+
+document.getElementById('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 function go(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -763,7 +840,18 @@ function notify(msg,color){
 // ADDRESS AUTOCOMPLETE
 let addrTimer = null;
 let addrCache = {};
+let addrResults = [];
 let userLat = null, userLng = null;
+
+// Event delegation for address dropdown — avoids inline onclick with string interpolation
+document.getElementById('addr-dropdown').addEventListener('click', e => {
+  const opt = e.target.closest('.addr-option[data-idx]');
+  if (!opt) return;
+  const r = addrResults[parseInt(opt.dataset.idx)];
+  if (!r) return;
+  const {main, sub} = formatAddr(r);
+  selectAddr(parseFloat(r.lat), parseFloat(r.lon), main, sub);
+});
 
 // Get user location for biasing results
 if(navigator.geolocation){
@@ -826,17 +914,16 @@ async function addrSearch(val) {
     }
     
     if(!results.length) {
+      addrResults = [];
       dropdown.innerHTML = '<div class="addr-option"><div class="main" style="color:#555">Keine Ergebnisse</div></div>';
       dropdown.style.display = 'block';
       return;
     }
-    
-    dropdown.innerHTML = results.map(r => {
+
+    addrResults = results;
+    dropdown.innerHTML = results.map((r, i) => {
       const {main, sub} = formatAddr(r);
-      const safeMain = main.replace(/'/g,"&apos;");
-      const safeSub = sub.replace(/'/g,"&apos;");
-      const safeDisplay = r.display_name.replace(/'/g,"\'");
-      return `<div class="addr-option" onclick="selectAddr('${safeDisplay}', ${r.lat}, ${r.lon}, '${safeMain}', '${safeSub}')">
+      return `<div class="addr-option" data-idx="${i}">
         <div class="main">${main}</div>
         ${sub ? `<div class="sub">${sub}</div>` : ''}
       </div>`;
@@ -845,13 +932,12 @@ async function addrSearch(val) {
   }, 300);
 }
 
-function selectAddr(full, lat, lng, main, sub) {
-  // Show clean address: Straße Nummer, PLZ Stadt
+function selectAddr(lat, lng, main, sub) {
   const clean = main + (sub ? ', ' + sub : '');
   document.getElementById('c-addr').value = clean;
   document.getElementById('addr-dropdown').style.display = 'none';
-  window._selectedLat = parseFloat(lat);
-  window._selectedLng = parseFloat(lng);
+  window._selectedLat = lat;
+  window._selectedLng = lng;
 }
 
 window.addEventListener('resize',()=>{if(leafMap)leafMap.invalidateSize();});
