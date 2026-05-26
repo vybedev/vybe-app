@@ -508,7 +508,7 @@ try {
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' && currentUser) {
       currentUser = null;
-      events = [...EVENTS];
+      events = [];
       joined = [];
       if (leafMap) { leafMap.remove(); leafMap = null; markers = {}; }
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -533,26 +533,23 @@ async function loadEvents() {
       .select('*')
       .order('created_at', { ascending: false });
     if(error) { console.log('Load error:', error); return; }
-    if(data && data.length > 0) {
-      const dbEvents = data.map(e => ({
-        id: e.id,
-        title: e.title,
-        area: e.area || e.address,
-        type: e.type || 'house',
-        time: (e.date || 'Heute') + ' ' + (e.time || ''),
-        guests: e.guests || 1,
-        maxGuests: e.max_guests || 20,
-        color: e.color || '#ff2d55',
-        hot: e.hot || false,
-        lat: parseFloat(e.lat),
-        lng: parseFloat(e.lng),
-        desc: e.description || '',
-        userId: e.user_id || null,
-        hostName: e.host_name || null,
-      })).filter(e => e.lat && e.lng);
-      events = [...dbEvents, ...EVENTS];
-      renderMarkers();
-    }
+    events = (data || []).map(e => ({
+      id: e.id,
+      title: e.title,
+      area: e.area || e.address,
+      type: e.type || 'house',
+      time: (e.date || 'Heute') + ' ' + (e.time || ''),
+      guests: e.guests || 1,
+      maxGuests: e.max_guests || 20,
+      color: e.color || '#ff2d55',
+      hot: e.hot || false,
+      lat: parseFloat(e.lat),
+      lng: parseFloat(e.lng),
+      desc: e.description || '',
+      userId: e.user_id || null,
+      hostName: e.host_name || null,
+    })).filter(e => e.lat && e.lng);
+    renderMarkers();
   } catch(e) { console.log('Load error:', e); }
 }
 
@@ -588,18 +585,10 @@ async function saveEventToDb(ev) {
   } catch(e) { console.log('Save error:', e); }
 }
 
-const EVENTS = [
-  {id:1,title:"Rooftop Rave",area:"Mitte",type:"rave",time:"Heute 22:00",guests:34,maxGuests:60,color:"#ff2d55",hot:true,lat:52.529,lng:13.402,desc:"Rooftop mit Panoramablick. Hartes Techno-Lineup."},
-  {id:2,title:"Garden Chill",area:"Prenzlberg",type:"chill",time:"Heute 19:00",guests:12,maxGuests:25,color:"#30d158",hot:false,lat:52.536,lng:13.412,desc:"Gartenparty mit Lichterketten und gutem Wein."},
-  {id:3,title:"HAUZ NACHT",area:"Neukölln",type:"underground",time:"Morgen 00:00",guests:89,maxGuests:120,color:"#bf5af2",hot:true,lat:52.482,lng:13.435,desc:"Underground. Kein Social Media."},
-  {id:4,title:"Pregame @ Mias",area:"Friedrichshain",type:"house",time:"Sa 20:00",guests:8,maxGuests:20,color:"#ffd60a",hot:false,lat:52.516,lng:13.453,desc:"Kleines Pregame bevor wir in den Club."},
-  {id:5,title:"Balkon Sunset",area:"Kreuzberg",type:"chill",time:"Sa 18:00",guests:6,maxGuests:15,color:"#ff9f0a",hot:false,lat:52.499,lng:13.417,desc:"Sonnenuntergang, Cocktails. Casual Dress."},
-  {id:6,title:"Bass Station",area:"Neukölln",type:"rave",time:"Heute 23:00",guests:55,maxGuests:80,color:"#ff2d55",hot:true,lat:52.489,lng:13.428,desc:"Basement, lauter Bass, kein Einlass nach 1 Uhr."},
-];
 const TICONS={rave:"⚡",chill:"🌿",house:"🏠",underground:"🖤"};
 const COLORS=["#ff2d55","#bf5af2","#30d158","#ffd60a","#ff9f0a"];
 
-let events=[...EVENTS], joined=[], activeEv=null, mapFilter="Alle";
+let events=[], joined=[], activeEv=null, mapFilter="Alle";
 let leafMap=null, markers={};
 let cType="rave", cPriv="public";
 
@@ -638,7 +627,7 @@ function afterLogin(user) {
 async function doLogout() {
   if (sb) await sb.auth.signOut();
   currentUser = null;
-  events = [...EVENTS];
+  events = [];
   joined = [];
   if (leafMap) { leafMap.remove(); leafMap = null; markers = {}; }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
