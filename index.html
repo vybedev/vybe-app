@@ -1364,19 +1364,23 @@ async function searchFriend() {
   foundFriendProfile = null;
 
   // Username zuerst, dann E-Mail als Fallback
+  console.log('[searchFriend] val:', val);
   let profile = null;
-  const { data: byUser } = await sb.from('profiles')
+  const { data: byUser, error: errUser } = await sb.from('profiles')
     .select('id, display_name, username, email, avatar')
     .eq('username', val).maybeSingle();
+  console.log('[searchFriend] byUsername:', byUser, 'error:', errUser);
   if (byUser) {
     profile = byUser;
   } else {
-    const { data: byEmail } = await sb.from('profiles')
+    const { data: byEmail, error: errEmail } = await sb.from('profiles')
       .select('id, display_name, username, email, avatar')
       .eq('email', val).maybeSingle();
+    console.log('[searchFriend] byEmail:', byEmail, 'error:', errEmail);
     profile = byEmail;
   }
 
+  console.log('[searchFriend] final profile:', profile);
   if (!profile) {
     resultEl.innerHTML = '<div style="color:#ff9f0a;font-size:13px;padding:4px 0;">Niemanden gefunden 🤷</div>';
     return;
