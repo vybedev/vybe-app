@@ -226,6 +226,7 @@ textarea.inp{resize:none;min-height:80px;}
       <div id="ec-host" style="font-size:11px;color:var(--muted);margin-bottom:10px;display:none;"></div>
       <div class="ec-btns">
         <button class="ec-join" id="ec-join" onclick="joinEv()">DABEI →</button>
+        <button class="ec-x" id="ec-delete" onclick="deleteEv()" style="display:none;background:#1a0005;border-color:var(--red);color:var(--red);">🗑</button>
         <button class="ec-x" onclick="closeCard()">✕</button>
       </div>
     </div>
@@ -882,10 +883,29 @@ function showCard(ev){
   const btn=document.getElementById('ec-join');
   btn.textContent=isIn?'ABMELDEN':'DABEI →';
   btn.style.background=isIn?'#1a1a1a':ev.color;
+  const isOwner = currentUser && ev.userId && ev.userId === currentUser.id;
+  document.getElementById('ec-delete').style.display = isOwner ? 'flex' : 'none';
   document.getElementById('ev-card').classList.add('show');
   leafMap.panTo([ev.lat,ev.lng],{animate:true,duration:.4});
 }
 function closeCard(){document.getElementById('ev-card').classList.remove('show');activeEv=null;}
+
+async function deleteEv(){
+  if(!activeEv || activeEv.userId !== currentUser?.id) return;
+  const ev=activeEv;
+  const delBtn=document.getElementById('ec-delete');
+  delBtn.textContent='...';
+  delBtn.disabled=true;
+  if(sb && ev.userId){
+    const{error}=await sb.from('events').delete().eq('id',ev.id).eq('user_id',currentUser.id);
+    if(error){notify('Fehler beim Löschen','#ff9f0a');delBtn.textContent='🗑';delBtn.disabled=false;return;}
+  }
+  events=events.filter(e=>e.id!==ev.id);
+  joined=joined.filter(x=>x!==ev.id);
+  closeCard();
+  renderMarkers();
+  notify('Event gelöscht','#555');
+}
 function joinEv(){
   if(!activeEv) return;
   if(joined.includes(activeEv.id)){
