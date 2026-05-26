@@ -603,11 +603,21 @@ setTimeout(async () => {
   document.getElementById('login').classList.add('active');
 }, 2200);
 
+function applyProfileDisplay(user) {
+  const meta = user.user_metadata || {};
+  document.getElementById('pname').textContent = meta.name || user.email?.split('@')[0] || 'User';
+  document.getElementById('phandle').textContent = '@' + (meta.username || user.email?.split('@')[0] || 'user');
+  const pbio = document.getElementById('pbio');
+  pbio.textContent = meta.bio || '';
+  pbio.style.display = meta.bio ? 'block' : 'none';
+  const pcity = document.getElementById('pcity');
+  pcity.textContent = meta.city ? '📍 ' + meta.city : '';
+  pcity.style.display = meta.city ? 'block' : 'none';
+}
+
 function afterLogin(user) {
   currentUser = user;
-  const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
-  document.getElementById('pname').textContent = name;
-  document.getElementById('phandle').textContent = '@' + (user.email?.split('@')[0] || 'user');
+  applyProfileDisplay(user);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('map-screen').classList.add('active');
   setTimeout(() => { initMap(); loadEvents(); }, 100);
@@ -624,6 +634,69 @@ async function doLogout() {
   document.getElementById('login-email').value = '';
   document.getElementById('login-pw').value = '';
   document.getElementById('auth-error').style.display = 'none';
+}
+
+function openEditProfil() {
+  const meta = currentUser?.user_metadata || {};
+  document.getElementById('ep-name').value = meta.name || '';
+  document.getElementById('ep-handle').value = meta.username || '';
+  document.getElementById('ep-bio').value = meta.bio || '';
+  document.getElementById('ep-birthday').value = meta.birthday || '';
+  document.getElementById('ep-city').value = meta.city || '';
+  // Max date = today minus 16 years
+  const max = new Date();
+  max.setFullYear(max.getFullYear() - 16);
+  document.getElementById('ep-birthday').max = max.toISOString().split('T')[0];
+  document.getElementById('ep-error').style.display = 'none';
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+async function saveProfile() {
+  const name = document.getElementById('ep-name').value.trim();
+  const username = document.getElementById('ep-handle').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  const bio = document.getElementById('ep-bio').value.trim();
+  const birthday = document.getElementById('ep-birthday').value;
+  const city = document.getElementById('ep-city').value.trim();
+  const errEl = document.getElementById('ep-error');
+  errEl.style.display = 'none';
+
+  if (!name) {
+    errEl.textContent = 'Anzeigename darf nicht leer sein.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (birthday) {
+    const birth = new Date(birthday);
+    const minAge = new Date();
+    minAge.setFullYear(minAge.getFullYear() - 16);
+    if (birth > minAge) {
+      errEl.textContent = 'Du musst mindestens 16 Jahre alt sein.';
+      errEl.style.display = 'block';
+      return;
+    }
+  }
+
+  const btn = document.getElementById('ep-save-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  const { data, error } = await sb.auth.updateUser({
+    data: { name, username, bio, birthday, city },
+  });
+
+  btn.textContent = 'SPEICHERN ✓';
+  btn.disabled = false;
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  currentUser = data.user;
+  applyProfileDisplay(data.user);
+  closeModal('edit-modal');
+  notify('Profil gespeichert! ✓', '#30d158');
 }
 
 async function doLogin() {
