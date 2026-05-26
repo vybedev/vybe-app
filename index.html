@@ -224,6 +224,7 @@ textarea.inp{resize:none;min-height:80px;}
     <input class="inp" id="login-email" type="email" placeholder="E-Mail" autocomplete="email"/>
     <input class="inp" id="login-pw" type="password" placeholder="Passwort" autocomplete="current-password"/>
     <button class="btn-r" id="login-btn" onclick="doLogin()">EINLOGGEN →</button>
+    <button id="forgot-btn" onclick="doForgotPassword()" style="background:none;border:none;color:var(--muted);font-size:12px;font-family:'Syne';cursor:pointer;margin-top:6px;text-decoration:underline;">Passwort vergessen?</button>
     <div class="divider" id="auth-divider">neu hier?</div>
     <button class="btn-s" id="register-btn" onclick="showRegister()">ACCOUNT ERSTELLEN</button>
   </div>
@@ -870,6 +871,36 @@ async function doLogin() {
   afterLogin(data.user);
 }
 
+async function doForgotPassword() {
+  const email = document.getElementById('login-email').value.trim();
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  if (!email) {
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = 'Bitte zuerst deine E-Mail eingeben.';
+    errEl.style.display = 'block';
+    document.getElementById('login-email').focus();
+    return;
+  }
+  const btn = document.getElementById('forgot-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href,
+  });
+  btn.textContent = 'Passwort vergessen?';
+  btn.disabled = false;
+  if (error) {
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.color = 'var(--green)';
+  errEl.textContent = '✓ Reset-Link wurde an ' + email + ' gesendet.';
+  errEl.style.display = 'block';
+}
+
 function showRegister() {
   document.getElementById('register-name').style.display = 'block';
   document.getElementById('login-btn').textContent = 'REGISTRIEREN →';
@@ -879,6 +910,7 @@ function showRegister() {
   document.getElementById('auth-divider').textContent = 'account erstellen';
   document.getElementById('login-pw').setAttribute('autocomplete', 'new-password');
   document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('forgot-btn').style.display = 'none';
   document.getElementById('register-name').focus();
 }
 
@@ -892,6 +924,7 @@ function showLogin() {
   document.getElementById('auth-divider').textContent = 'neu hier?';
   document.getElementById('login-pw').setAttribute('autocomplete', 'current-password');
   document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('forgot-btn').style.display = 'block';
 }
 
 async function doRegister() {
