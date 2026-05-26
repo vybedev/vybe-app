@@ -189,11 +189,12 @@ textarea.inp{resize:none;min-height:80px;}
     <div class="login-logo">VYBE</div>
     <div class="login-sub">FIND YOUR SCENE</div>
     <div id="auth-error" style="color:var(--red);font-size:12px;margin-bottom:12px;text-align:center;display:none;width:100%;"></div>
+    <input class="inp" id="register-name" type="text" placeholder="Anzeigename" autocomplete="name" style="display:none;"/>
     <input class="inp" id="login-email" type="email" placeholder="E-Mail" autocomplete="email"/>
     <input class="inp" id="login-pw" type="password" placeholder="Passwort" autocomplete="current-password"/>
     <button class="btn-r" id="login-btn" onclick="doLogin()">EINLOGGEN →</button>
-    <div class="divider">neu hier?</div>
-    <button class="btn-s" id="register-btn" onclick="doRegister()">ACCOUNT ERSTELLEN</button>
+    <div class="divider" id="auth-divider">neu hier?</div>
+    <button class="btn-s" id="register-btn" onclick="showRegister()">ACCOUNT ERSTELLEN</button>
   </div>
 </div>
 
@@ -624,13 +625,43 @@ async function doLogin() {
   afterLogin(data.user);
 }
 
+function showRegister() {
+  document.getElementById('register-name').style.display = 'block';
+  document.getElementById('login-btn').textContent = 'REGISTRIEREN →';
+  document.getElementById('login-btn').onclick = doRegister;
+  document.getElementById('register-btn').textContent = '← ZURÜCK ZUM LOGIN';
+  document.getElementById('register-btn').onclick = showLogin;
+  document.getElementById('auth-divider').textContent = 'account erstellen';
+  document.getElementById('login-pw').setAttribute('autocomplete', 'new-password');
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('register-name').focus();
+}
+
+function showLogin() {
+  document.getElementById('register-name').style.display = 'none';
+  document.getElementById('register-name').value = '';
+  document.getElementById('login-btn').textContent = 'EINLOGGEN →';
+  document.getElementById('login-btn').onclick = doLogin;
+  document.getElementById('register-btn').textContent = 'ACCOUNT ERSTELLEN';
+  document.getElementById('register-btn').onclick = showRegister;
+  document.getElementById('auth-divider').textContent = 'neu hier?';
+  document.getElementById('login-pw').setAttribute('autocomplete', 'current-password');
+  document.getElementById('auth-error').style.display = 'none';
+}
+
 async function doRegister() {
+  const name = document.getElementById('register-name').value.trim();
   const email = document.getElementById('login-email').value.trim();
   const pw = document.getElementById('login-pw').value;
   const errEl = document.getElementById('auth-error');
   errEl.style.display = 'none';
   errEl.style.color = 'var(--red)';
 
+  if (!name) {
+    errEl.textContent = 'Bitte einen Anzeigenamen eingeben.';
+    errEl.style.display = 'block';
+    return;
+  }
   if (!email || !pw) {
     errEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
     errEl.style.display = 'block';
@@ -642,12 +673,16 @@ async function doRegister() {
     return;
   }
 
-  const btn = document.getElementById('register-btn');
+  const btn = document.getElementById('login-btn');
   btn.textContent = '...';
   btn.disabled = true;
 
-  const { data, error } = await sb.auth.signUp({ email, password: pw });
-  btn.textContent = 'ACCOUNT ERSTELLEN';
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password: pw,
+    options: { data: { name } },
+  });
+  btn.textContent = 'REGISTRIEREN →';
   btn.disabled = false;
 
   if (error) {
