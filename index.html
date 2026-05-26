@@ -327,12 +327,13 @@ textarea.inp{resize:none;min-height:80px;}
     <div class="prof-head">
       <div class="prof-ava">🎤</div>
       <div class="prof-name" id="pname">Mert</div>
-      <div class="prof-handle">@mert · <span style="color:var(--purple)">👑 VIP</span></div>
+      <div class="prof-handle"><span id="phandle">@user</span> · <span style="color:var(--purple)">👑 VIP</span></div>
       <div class="badges"><span class="bdg gold">🥇 GOLD</span><span class="bdg vip">👑 VIP</span><span class="bdg host">🎤 HOST</span></div>
       <div style="display:flex;gap:8px;">
         <button style="flex:1;background:var(--red);border:none;border-radius:12px;padding:11px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;">EDIT PROFIL</button>
         <button style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:11px 14px;color:#fff;font-size:13px;cursor:pointer;" onclick="go('vip-screen')">👑 VIP</button>
       </div>
+      <button onclick="doLogout()" style="width:100%;margin-top:8px;background:none;border:1px solid #333;border-radius:12px;padding:11px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:Syne;">AUSLOGGEN</button>
     </div>
     <div class="stats-row">
       <div class="stat"><div class="stat-n">23</div><div class="stat-l">EVENTS</div></div>
@@ -554,11 +555,25 @@ setTimeout(async () => {
 
 function afterLogin(user) {
   currentUser = user;
-  const name = user.user_metadata?.name || user.email?.split('@')[0] || 'Mert';
+  const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
   document.getElementById('pname').textContent = name;
+  document.getElementById('phandle').textContent = '@' + (user.email?.split('@')[0] || 'user');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('map-screen').classList.add('active');
   setTimeout(() => { initMap(); loadEvents(); }, 100);
+}
+
+async function doLogout() {
+  if (sb) await sb.auth.signOut();
+  currentUser = null;
+  events = [...EVENTS];
+  joined = [];
+  if (leafMap) { leafMap.remove(); leafMap = null; markers = {}; }
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('login').classList.add('active');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pw').value = '';
+  document.getElementById('auth-error').style.display = 'none';
 }
 
 async function doLogin() {
