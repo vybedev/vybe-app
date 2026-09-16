@@ -218,21 +218,17 @@ textarea.inp{resize:none;min-height:80px;}
   </div>
 </div>
 
-<!-- LOGIN -->
+<!-- SESSION NAME -->
 <div class="page" id="login">
   <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;">
     <div class="login-logo">VYBE</div>
     <div class="login-sub">FIND YOUR SCENE</div>
     <div id="auth-error" style="color:var(--red);font-size:12px;margin-bottom:12px;text-align:center;display:none;width:100%;"></div>
-    <input class="inp" id="register-name" type="text" placeholder="Anzeigename" autocomplete="name" style="display:none;"/>
-    <input class="inp" id="login-email" type="email" placeholder="E-Mail" autocomplete="email"/>
-    <input class="inp" id="login-pw" type="password" placeholder="Passwort" autocomplete="current-password"/>
-    <button class="btn-r" id="login-btn" onclick="doLogin()">EINLOGGEN →</button>
-    <button id="forgot-btn" onclick="doForgotPassword()" style="background:none;border:none;color:#888;font-size:12px;font-family:'Syne';cursor:pointer;margin-top:8px;margin-bottom:4px;text-decoration:underline;width:100%;text-align:right;padding:0;">Passwort vergessen?</button>
-    <div class="divider" id="auth-divider">neu hier?</div>
-    <button class="btn-s" id="register-btn" onclick="showRegister()">ACCOUNT ERSTELLEN</button>
+    <input class="inp" id="guest-name" type="text" placeholder="Wie sollen wir dich nennen?" autocomplete="off" maxlength="24"/>
+    <button class="btn-r" id="login-btn" onclick="confirmGuestName()">LOS →</button>
   </div>
 </div>
+
 
 <!-- MAP -->
 <div class="page" id="map-screen">
@@ -309,7 +305,7 @@ textarea.inp{resize:none;min-height:80px;}
       <div class="post-cap">Abend auf der Terasse ☀️ noch Plätze frei!</div>
     </div>
     <div class="post">
-      <div class="post-head"><div class="post-ava" style="background:#bf5af2;">🖤</div><div><div class="post-nm">KollektivX</div><div class="post-ev">📍 HAUZ NACHT · Neukölln</div></div><span class="live-tag" style="background:var(--purple);">👑 VIP</span></div>
+      <div class="post-head"><div class="post-ava" style="background:#bf5af2;">🖤</div><div><div class="post-nm">KollektivX</div><div class="post-ev">📍 HAUZ NACHT · Neukölln</div></div></div>
       <div class="post-img" style="background:linear-gradient(135deg,#100018,#1a0028);">🖤</div>
       <div class="post-acts">
         <button class="act" onclick="like(this)"><span>🔥</span><span>512</span></button>
@@ -371,15 +367,13 @@ textarea.inp{resize:none;min-height:80px;}
     <div class="prof-head">
       <div class="prof-ava">🎤</div>
       <div class="prof-name" id="pname">Mert</div>
-      <div class="prof-handle"><span id="phandle">@user</span> · <span style="color:var(--purple)">👑 VIP</span></div>
+      <div class="prof-handle"><span id="phandle">@user</span></div>
       <div id="pcity" style="display:none;font-size:11px;color:var(--muted);margin-top:4px;"></div>
       <div id="pbio" style="display:none;font-size:13px;color:#aaa;margin:8px 0 4px;line-height:1.5;max-width:280px;text-align:center;"></div>
-      <div class="badges"><span class="bdg gold">🥇 GOLD</span><span class="bdg vip">👑 VIP</span><span class="bdg host">🎤 HOST</span></div>
       <div style="display:flex;gap:8px;">
         <button style="flex:1;background:var(--red);border:none;border-radius:12px;padding:11px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;" onclick="openEditProfil()">EDIT PROFIL</button>
-        <button style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:11px 14px;color:#fff;font-size:13px;cursor:pointer;" onclick="go('vip-screen')">👑 VIP</button>
       </div>
-      <button onclick="doLogout()" style="width:100%;margin-top:8px;background:none;border:1px solid #333;border-radius:12px;padding:11px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:Syne;">AUSLOGGEN</button>
+      <button onclick="doLogout()" style="width:100%;margin-top:8px;background:none;border:1px solid #333;border-radius:12px;padding:11px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:Syne;">NAMEN ÄNDERN</button>
     </div>
     <div class="stats-row">
       <div class="stat"><div class="stat-n">23</div><div class="stat-l">EVENTS</div></div>
@@ -396,17 +390,9 @@ textarea.inp{resize:none;min-height:80px;}
             <div class="ava-item" onclick="selAva(this,'🧢')">🧢</div>
             <div class="ava-item" onclick="selAva(this,'🕶')">🕶</div>
             <div class="ava-item" onclick="selAva(this,'⛓')">⛓</div>
-            <div class="ava-item locked">👑</div>
-            <div class="ava-item locked">💎</div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="sec-box">
-      <div class="sec-t">LEVEL & FORTSCHRITT</div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-size:14px;font-weight:700;">🥇 GOLD</span><span style="font-size:11px;color:var(--muted);">23/50 → Platin</span></div>
-      <div class="prog-bg"><div class="prog" style="width:46%;"></div></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Noch 27 Events bis 💎 Platin</div>
     </div>
     <div style="padding:0 14px 10px;">
       <div style="font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:10px;font-weight:700;">MEINE EVENTS</div>
@@ -493,14 +479,12 @@ textarea.inp{resize:none;min-height:80px;}
       <span class="sel-pill" onclick="setCType(this,'underground')">🖤 Underground</span>
     </div>
   </div>
-  <div class="field"><div class="field-lbl">PRIVACY</div>
-    <div class="pills-row">
-      <span class="sel-pill on" onclick="setCPriv(this,'public')">🌍 Public</span>
-      <span class="sel-pill" onclick="setCPriv(this,'private')">🔒 Private</span>
-      <span class="sel-pill" onclick="setCPriv(this,'ghost')">👻 Ghost (VIP)</span>
-    </div>
-  </div>
   <div class="field"><div class="field-lbl">BESCHREIBUNG</div><textarea class="inp" id="c-desc" placeholder="Was erwartet die Leute?"></textarea></div>
+  <div class="field">
+    <div class="field-lbl">PASSWORT (OPTIONAL)</div>
+    <input class="inp" id="c-pw" type="text" placeholder="Leer lassen = öffentliches Event" autocomplete="off"/>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Mit Passwort: nur grobes Areal sichtbar für alle — genauer Standort & Details nur mit Passwort.</div>
+  </div>
   <div class="field"><button style="width:100%;background:var(--red);border:none;border-radius:14px;padding:17px;color:#fff;font-size:14px;font-weight:800;letter-spacing:2px;cursor:pointer;font-family:Syne;" onclick="doCreate()">EVENT ERSTELLEN 🎉</button></div>
 </div>
 
@@ -514,7 +498,7 @@ textarea.inp{resize:none;min-height:80px;}
   <div class="field">
     <div class="field-lbl">USERNAME</div>
     <div class="at-wrap"><span class="at-sign">@</span><input class="inp" id="ep-handle" type="text" placeholder="username" autocomplete="off"/></div>
-    <div style="font-size:10px;color:var(--muted);margin-top:5px;padding-left:2px;">Nur Buchstaben, Zahlen, Unterstriche</div>
+<div style="font-size:10px;color:var(--muted);margin-top:5px;padding-left:2px;">Nur Buchstaben, Zahlen, Unterstriche</div>
   </div>
   <div class="field"><div class="field-lbl">BIO</div><textarea class="inp" id="ep-bio" placeholder="Ein paar Worte über dich..." style="resize:none;min-height:72px;"></textarea></div>
   <div class="field">
@@ -574,8 +558,6 @@ try {
       if (leafMap) { leafMap.remove(); leafMap = null; markers = {}; }
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById('login').classList.add('active');
-      document.getElementById('login-email').value = '';
-      document.getElementById('login-pw').value = '';
       document.getElementById('auth-error').style.display = 'none';
     }
     if (event === 'TOKEN_REFRESHED' && session) {
@@ -686,7 +668,7 @@ function stopCleanupSchedule() {
   if(cleanupInterval) { clearInterval(cleanupInterval); cleanupInterval = null; }
 }
 
-async function saveEventToDb(ev) {
+async function saveEventToDb(ev, secret) {
   if(!sb) return;
   try {
     const { data, error } = await sb.from('events').insert([{
@@ -704,7 +686,8 @@ async function saveEventToDb(ev) {
       lng: ev.lng,
       description: ev.desc,
       user_id: currentUser?.id || null,
-      host_name: currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || null,
+      host_name: ev.hostName || guestName || 'Gast',
+      protected: !!ev.protected,
     }]).select('id').single();
     if(error) { console.log('Save error:', error); return; }
     // Sync the local Date.now() id with the real DB UUID so delete works correctly
@@ -713,6 +696,17 @@ async function saveEventToDb(ev) {
       events = events.map(e => e.id === ev.id ? {...e, id: dbId} : e);
       joined = joined.map(x => x === ev.id ? dbId : x);
       renderMarkers(); // rebuild click-handler closures with the real UUID
+      if(secret) {
+        const { error: secErr } = await sb.rpc('create_event_secret', {
+          p_event_id: dbId,
+          p_password: secret.password,
+          p_real_lat: secret.realLat,
+          p_real_lng: secret.realLng,
+          p_real_address: secret.realAddress,
+          p_real_description: secret.realDesc,
+        });
+        if(secErr) { console.log('Secret save error:', secErr); notify('Event gespeichert, aber Passwortschutz fehlgeschlagen ⚠️','#ff9f0a'); return; }
+      }
     }
     notify('Event gespeichert! 🔥', '#30d158');
   } catch(e) { console.log('Save error:', e); }
@@ -732,17 +726,46 @@ let friends=[], friendRequests=[], pendingOutgoing=[];
 let friendLocations={}, friendMarkers={};
 let locationSharing=false, locationBroadcastId=null, locationChannel=null;
 
-// SPLASH — check for existing session, skip login if already authenticated
-setTimeout(async () => {
+// SPLASH — app is open access for the test phase, no account required.
+// Nutzer geben sich für diese Session einen Namen; Login-Code bleibt für später erhalten.
+let guestName = null;
+
+setTimeout(() => {
   document.getElementById('splash').classList.remove('active');
-  if (sb) {
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (session) { afterLogin(session.user); return; }
-    } catch(e) {}
+  const saved = sessionStorage.getItem('vybe_guest_name');
+  if (saved) {
+    guestName = saved;
+    enterGuestMode();
+  } else {
+    document.getElementById('login').classList.add('active');
+    document.getElementById('guest-name').focus();
   }
-  document.getElementById('login').classList.add('active');
 }, 2200);
+
+function confirmGuestName() {
+  const input = document.getElementById('guest-name');
+  const name = input.value.trim().slice(0, 24) || 'Gast';
+  guestName = name;
+  sessionStorage.setItem('vybe_guest_name', name);
+  document.getElementById('login').classList.remove('active');
+  enterGuestMode();
+}
+document.getElementById('guest-name').addEventListener('keydown', e => { if (e.key === 'Enter') confirmGuestName(); });
+
+function enterGuestMode() {
+  currentUser = null;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('map-screen').classList.add('active');
+  // Account-Features (Freunde, Live-Standort-Teilen) sind ohne Login sinnlos — ausblenden für die Testphase
+  const friendsBtn = document.getElementById('friends-btn');
+  const locToggle = document.getElementById('loc-toggle');
+  if (friendsBtn) friendsBtn.style.display = 'none';
+  if (locToggle) locToggle.style.display = 'none';
+  setTimeout(() => {
+    initMap();
+    loadEvents().then(() => { subscribeToEvents(); startCleanupSchedule(); startGpsWatch(); });
+  }, 100);
+}
 
 function applyProfileDisplay(user) {
   const meta = user.user_metadata || {};
@@ -774,15 +797,15 @@ async function doLogout() {
   await stopLocationBroadcast();
   clearFriendState();
   if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-  if (sb) await sb.auth.signOut();
   currentUser = null;
   events = [];
   joined = [];
   if (leafMap) { leafMap.remove(); leafMap = null; markers = {}; }
+  sessionStorage.removeItem('vybe_guest_name');
+  guestName = null;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('login').classList.add('active');
-  document.getElementById('login-email').value = '';
-  document.getElementById('login-pw').value = '';
+  document.getElementById('guest-name').value = '';
   document.getElementById('auth-error').style.display = 'none';
 }
 
@@ -849,141 +872,9 @@ async function saveProfile() {
   notify('Profil gespeichert! ✓', '#30d158');
 }
 
-async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pw = document.getElementById('login-pw').value;
-  const errEl = document.getElementById('auth-error');
-  errEl.style.display = 'none';
-  errEl.style.color = 'var(--red)';
-
-  if (!email || !pw) {
-    errEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  const btn = document.getElementById('login-btn');
-  btn.textContent = '...';
-  btn.disabled = true;
-
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
-  btn.textContent = 'EINLOGGEN →';
-  btn.disabled = false;
-
-  if (error) {
-    errEl.textContent = error.message === 'Invalid login credentials'
-      ? 'E-Mail oder Passwort falsch.'
-      : error.message;
-    errEl.style.display = 'block';
-    return;
-  }
-  afterLogin(data.user);
-}
-
-async function doForgotPassword() {
-  const email = document.getElementById('login-email').value.trim();
-  const errEl = document.getElementById('auth-error');
-  errEl.style.display = 'none';
-  if (!email) {
-    errEl.style.color = 'var(--red)';
-    errEl.textContent = 'Bitte zuerst deine E-Mail eingeben.';
-    errEl.style.display = 'block';
-    document.getElementById('login-email').focus();
-    return;
-  }
-  const btn = document.getElementById('forgot-btn');
-  btn.textContent = '...';
-  btn.disabled = true;
-  const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.href,
-  });
-  btn.textContent = 'Passwort vergessen?';
-  btn.disabled = false;
-  if (error) {
-    errEl.style.color = 'var(--red)';
-    errEl.textContent = error.message;
-    errEl.style.display = 'block';
-    return;
-  }
-  errEl.style.color = 'var(--green)';
-  errEl.textContent = '✓ Reset-Link wurde an ' + email + ' gesendet.';
-  errEl.style.display = 'block';
-}
-
-function showRegister() {
-  document.getElementById('register-name').style.display = 'block';
-  document.getElementById('login-btn').textContent = 'REGISTRIEREN →';
-  document.getElementById('login-btn').onclick = doRegister;
-  document.getElementById('register-btn').textContent = '← ZURÜCK ZUM LOGIN';
-  document.getElementById('register-btn').onclick = showLogin;
-  document.getElementById('auth-divider').textContent = 'account erstellen';
-  document.getElementById('login-pw').setAttribute('autocomplete', 'new-password');
-  document.getElementById('auth-error').style.display = 'none';
-  document.getElementById('forgot-btn').style.display = 'none';
-  document.getElementById('register-name').focus();
-}
-
-function showLogin() {
-  document.getElementById('register-name').style.display = 'none';
-  document.getElementById('register-name').value = '';
-  document.getElementById('login-btn').textContent = 'EINLOGGEN →';
-  document.getElementById('login-btn').onclick = doLogin;
-  document.getElementById('register-btn').textContent = 'ACCOUNT ERSTELLEN';
-  document.getElementById('register-btn').onclick = showRegister;
-  document.getElementById('auth-divider').textContent = 'neu hier?';
-  document.getElementById('login-pw').setAttribute('autocomplete', 'current-password');
-  document.getElementById('auth-error').style.display = 'none';
-  document.getElementById('forgot-btn').style.display = 'block';
-}
-
-async function doRegister() {
-  const name = document.getElementById('register-name').value.trim();
-  const email = document.getElementById('login-email').value.trim();
-  const pw = document.getElementById('login-pw').value;
-  const errEl = document.getElementById('auth-error');
-  errEl.style.display = 'none';
-  errEl.style.color = 'var(--red)';
-
-  if (!name) {
-    errEl.textContent = 'Bitte einen Anzeigenamen eingeben.';
-    errEl.style.display = 'block';
-    return;
-  }
-  if (!email || !pw) {
-    errEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
-    errEl.style.display = 'block';
-    return;
-  }
-  if (pw.length < 6) {
-    errEl.textContent = 'Passwort muss mindestens 6 Zeichen haben.';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  const btn = document.getElementById('login-btn');
-  btn.textContent = '...';
-  btn.disabled = true;
-
-  const { data, error } = await sb.auth.signUp({
-    email,
-    password: pw,
-    options: { data: { name } },
-  });
-  btn.textContent = 'REGISTRIEREN →';
-  btn.disabled = false;
-
-  if (error) {
-    errEl.textContent = error.message === 'User already registered'
-      ? 'Diese E-Mail ist bereits registriert.'
-      : error.message;
-    errEl.style.display = 'block';
-    return;
-  }
-
-  afterLogin(data.user);
-}
-
-document.getElementById('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+// Email/Passwort-Auth (doLogin/doRegister/showRegister/showLogin/doForgotPassword) entfernt —
+// ersetzt durch confirmGuestName() oben. Supabase-Auth-Funktionen (sb.auth.*) bleiben für ein
+// späteres echtes Account-System nutzbar, werden aktuell aber nicht mehr aufgerufen.
 
 function go(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -1002,19 +893,19 @@ function initMap(){
   if(leafMap) return;
   const wrap=document.getElementById('map-wrap');
   document.getElementById('leaflet-map').style.height=(wrap.clientHeight)+'px';
-  
+
   leafMap=L.map('leaflet-map',{zoomControl:false,attributionControl:false}).setView([52.510,13.405],13);
-  
+
   // Dark CartoDB tiles
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
     maxZoom:19,subdomains:'abcd'
   }).addTo(leafMap);
-  
+
   L.control.zoom({position:'bottomright'}).addTo(leafMap);
   leafMap.on('click',()=>closeCard());
   leafMap.on('zoomend', () => { if (leafMap.getZoom() < 3) showGlobe(); });
   renderMarkers();
-  
+
   // Try GPS
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
@@ -1154,26 +1045,34 @@ async function doCreate(){
     lat = center.lat; lng = center.lng;
   }
 
+  const pw = document.getElementById('c-pw').value.trim();
+  const isProtected = pw.length > 0;
+  const publicArea = isProtected ? (addr.split(',').slice(1).join(',').trim() || addr) : addr;
+  const fuzzy = isProtected ? jitterCoords(lat, lng) : { lat, lng };
+  const realDesc = document.getElementById('c-desc').value || '';
+
   const ev={
-    id:Date.now(),title,area:addr,type:cType,
+    id:Date.now(),title,area:publicArea,type:cType,
     time:(document.getElementById('c-date').value||'Heute')+' '+(document.getElementById('c-time').value||'?:??'),
     guests:1,maxGuests:parseInt(document.getElementById('c-max').value)||20,
     color:COLORS[Math.floor(Math.random()*COLORS.length)],hot:false,
-    lat, lng,
-    desc:document.getElementById('c-desc').value||'',
+    lat: fuzzy.lat, lng: fuzzy.lng,
+    desc: isProtected ? '🔒 Details nach Passworteingabe sichtbar' : realDesc,
     userId: currentUser?.id || null,
-    hostName: currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || null,
+    hostName: guestName || 'Gast',
+    protected: isProtected,
   };
   events.unshift(ev);
   joined.push(ev.id);
   closeModal('create-modal');
-  ['c-title','c-addr','c-date','c-time','c-vibe','c-max','c-desc'].forEach(id=>document.getElementById(id).value='');
+  ['c-title','c-addr','c-date','c-time','c-vibe','c-max','c-desc','c-pw'].forEach(id=>document.getElementById(id).value='');
   createBtn.textContent='EVENT ERSTELLEN 🎉';
   createBtn.disabled=false;
   renderMarkers();
-  if(leafMap)leafMap.setView([lat,lng],16,{animate:true});
-  // Save to Supabase
-  saveEventToDb(ev);
+  if(leafMap)leafMap.setView([fuzzy.lat,fuzzy.lng],16,{animate:true});
+  // Save to Supabase — bei protected Events wird das Secret (echte Koordinaten/Adresse/
+  // Details, passwortgehasht) in einem zweiten Schritt server-seitig angelegt.
+  saveEventToDb(ev, isProtected ? { password: pw, realLat: lat, realLng: lng, realAddress: addr, realDesc } : null);
 }
 
 // CHAT
@@ -1599,7 +1498,7 @@ function initGlobe() {
 
   // Globe group — Berlin facing camera on start (lng 13.4°)
   globeGroup = new THREE.Group();
-  globeGroup.rotation.y = -(13.4 * Math.PI / 180);
+globeGroup.rotation.y = -(13.4 * Math.PI / 180);
   globeScene.add(globeGroup);
 
   // Sphere
@@ -1770,6 +1669,15 @@ function haversine(lat1,lng1,lat2,lng2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+// Verschiebt eine Koordinate um 250–450m in zufälliger Richtung — für passwortgeschützte
+// Events, deren echter Standort erst nach Passworteingabe sichtbar wird.
+function jitterCoords(lat,lng){
+  const R=6371000, dist=250+Math.random()*200, angle=Math.random()*2*Math.PI;
+  const dLat=(dist*Math.cos(angle))/R*(180/Math.PI);
+  const dLng=(dist*Math.sin(angle))/(R*Math.cos(lat*Math.PI/180))*(180/Math.PI);
+  return { lat: lat+dLat, lng: lng+dLng };
+}
+
 function startGpsWatch(){
   if(!navigator.geolocation) return;
   gpsWatchId=navigator.geolocation.watchPosition(onGpsUpdate,()=>{},{
@@ -1875,28 +1783,28 @@ function formatAddr(r) {
   const city = a.city || a.town || a.village || a.municipality || a.suburb || '';
   const postcode = a.postcode || '';
   const country = a.country_code ? a.country_code.toUpperCase() : '';
-  
+
   let main = '';
   if(road) main = road + (num ? ' ' + num : '');
   else main = r.display_name.split(',')[0];
-  
+
   let sub = '';
   if(postcode && city) sub = postcode + ' ' + city;
   else if(city) sub = city;
   if(country && country !== 'DE') sub += (sub ? ' · ' : '') + country;
-  
+
   return { main, sub, road, num, city, postcode };
 }
 
 async function addrSearch(val) {
   const dropdown = document.getElementById('addr-dropdown');
   if(val.length < 2) { dropdown.style.display = 'none'; return; }
-  
+
   clearTimeout(addrTimer);
   addrTimer = setTimeout(async () => {
     const normalized = normalizeAddr(val);
     const cacheKey = normalized.toLowerCase();
-    
+
     let results;
     if(addrCache[cacheKey]) {
       results = addrCache[cacheKey];
@@ -1912,7 +1820,7 @@ async function addrSearch(val) {
         addrCache[cacheKey] = results;
       } catch(e) { return; }
     }
-    
+
     if(!results.length) {
       addrResults = [];
       dropdown.innerHTML = '<div class="addr-option"><div class="main" style="color:#555">Keine Ergebnisse</div></div>';
