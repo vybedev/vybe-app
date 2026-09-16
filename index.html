@@ -256,6 +256,15 @@ textarea.inp{resize:none;min-height:80px;}
       <div class="ec-name" id="ec-name"></div>
       <div class="ec-meta" id="ec-meta"></div>
       <div id="ec-host" style="font-size:11px;color:var(--muted);margin-bottom:10px;display:none;"></div>
+      <div id="ec-desc" style="font-size:12px;color:#999;margin-bottom:10px;line-height:1.5;display:none;"></div>
+      <div id="ec-lock" style="display:none;margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔒 Genauer Standort & Details sind passwortgeschützt</div>
+        <div style="display:flex;gap:8px;">
+          <input class="inp" id="ec-pw-input" type="password" placeholder="Passwort" autocomplete="off" style="margin-bottom:0;" onkeydown="if(event.key==='Enter')unlockEvent()"/>
+          <button style="background:var(--red);border:none;border-radius:14px;padding:0 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Syne;flex-shrink:0;" onclick="unlockEvent()" id="ec-unlock-btn">Freischalten</button>
+        </div>
+        <div id="ec-pw-error" style="display:none;color:var(--red);font-size:12px;margin-top:6px;"></div>
+      </div>
       <div class="ec-btns">
         <button class="ec-join" id="ec-join" onclick="joinEv()">DABEI →</button>
         <button class="ec-x" id="ec-delete" onclick="deleteEv()" style="display:none;background:#1a0005;border-color:var(--red);color:var(--red);">🗑</button>
@@ -584,6 +593,7 @@ function mapRow(e) {
     desc: e.description || '',
     userId: e.user_id || null,
     hostName: e.host_name || null,
+    protected: !!e.protected,
   };
 }
 
@@ -613,6 +623,9 @@ function subscribeToEvents() {
       if(events.find(e => e.id === ev.id)) return;
       events.unshift(ev);
       if(leafMap && (mapFilter === 'Alle' || ev.type === mapFilter)) {
+        if(ev.protected && !unlockedEvents.has(ev.id)) {
+          circles[ev.id] = L.circle([ev.lat, ev.lng], {radius:350, color:ev.color, weight:1, fillColor:ev.color, fillOpacity:.08, interactive:false}).addTo(leafMap);
+        }
         const m = L.marker([ev.lat, ev.lng], {icon: makeIcon(ev)}).addTo(leafMap);
         m.on('click', e => { e.originalEvent?.stopPropagation(); showCard(ev); });
         markers[ev.id] = m;
@@ -623,6 +636,7 @@ function subscribeToEvents() {
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'events' }, ({ old: row }) => {
       if(!row.id) return;
       if(markers[row.id]) { leafMap.removeLayer(markers[row.id]); delete markers[row.id]; }
+      if(circles[row.id]) { leafMap.removeLayer(circles[row.id]); delete circles[row.id]; }
       events = events.filter(e => e.id !== row.id);
       if(activeEv?.id === row.id) closeCard();
     })
@@ -654,6 +668,7 @@ async function cleanupOldEvents() {
   const deletedIds = new Set(data.map(r => r.id));
   deletedIds.forEach(id => {
     if(markers[id]) { leafMap?.removeLayer(markers[id]); delete markers[id]; }
+    if(circles[id]) { leafMap?.removeLayer(circles[id]); delete circles[id]; }
   });
   events = events.filter(e => !deletedIds.has(e.id));
   if(activeEv && deletedIds.has(activeEv.id)) closeCard();
@@ -716,7 +731,8 @@ const TICONS={rave:"⚡",chill:"🌿",house:"🏠",underground:"🖤"};
 const COLORS=["#ff2d55","#bf5af2","#30d158","#ffd60a","#ff9f0a"];
 
 let events=[], joined=[], activeEv=null, mapFilter="Alle";
-let leafMap=null, markers={}, realtimeChannel=null, cleanupInterval=null;
+let leafMap=null, markers={}, circles={}, realtimeChannel=null, cleanupInterval=null;
+let unlockedEvents=new Set(), unlockedData={};
 let cType="rave", cPriv="public";
 let autoCheckedIn=new Set(), gpsWatchId=null, userMarker=null;
 let globeActive=false, globeRenderer=null, globeScene=null, globeCamera=null;
@@ -916,11 +932,12 @@ function initMap(){
 
 function makeIcon(ev){
   const isJoined=joined.includes(ev.id);
+  const locked=ev.protected&&!unlockedEvents.has(ev.id);
   const div=document.createElement('div');
   div.className='vpin'+(ev.hot?' hot':'');
   div.style.background=ev.color;
   div.style.border=isJoined?'3px solid #fff':'3px solid #000';
-  div.innerHTML=TICONS[ev.type];
+  div.innerHTML=locked?'🔒':TICONS[ev.type];
   return L.divIcon({html:div,className:'',iconSize:[40,40],iconAnchor:[20,20]});
 }
 
@@ -928,7 +945,13 @@ function renderMarkers(){
   if(!leafMap) return;
   Object.values(markers).forEach(m=>leafMap.removeLayer(m));
   markers={};
+  Object.values(circles).forEach(c=>leafMap.removeLayer(c));
+  circles={};
   events.filter(e=>mapFilter==='Alle'||e.type===mapFilter).forEach(ev=>{
+    const locked=ev.protected&&!unlockedEvents.has(ev.id);
+    if(locked){
+      circles[ev.id]=L.circle([ev.lat,ev.lng],{radius:350,color:ev.color,weight:1,fillColor:ev.color,fillOpacity:.08,interactive:false}).addTo(leafMap);
+    }
     const m=L.marker([ev.lat,ev.lng],{icon:makeIcon(ev)}).addTo(leafMap);
     m.on('click',e=>{e.originalEvent?.stopPropagation();showCard(ev);});
     markers[ev.id]=m;
@@ -938,22 +961,78 @@ function renderMarkers(){
 function showCard(ev){
   activeEv=ev;
   const isIn=joined.includes(ev.id);
-  document.getElementById('ec-tag').textContent=ev.area.toUpperCase()+' · '+TICONS[ev.type]+' '+ev.type.toUpperCase();
+  const locked=ev.protected&&!unlockedEvents.has(ev.id);
+  const real=unlockedData[ev.id];
+  const area=real?real.address:ev.area;
+  document.getElementById('ec-tag').textContent=area.toUpperCase()+' · '+TICONS[ev.type]+' '+ev.type.toUpperCase();
   document.getElementById('ec-tag').style.color=ev.color;
   document.getElementById('ec-name').textContent=ev.title;
   document.getElementById('ec-meta').textContent='📅 '+ev.time+'   👥 '+ev.guests+'/'+ev.maxGuests;
   const hostEl=document.getElementById('ec-host');
   if(ev.hostName){hostEl.textContent='🎤 Host: '+ev.hostName;hostEl.style.display='block';}
   else{hostEl.style.display='none';}
+
+  const descEl=document.getElementById('ec-desc');
+  const lockEl=document.getElementById('ec-lock');
+  document.getElementById('ec-pw-error').style.display='none';
+  document.getElementById('ec-pw-input').value='';
+  if(locked){
+    descEl.style.display='none';
+    lockEl.style.display='block';
+  } else {
+    lockEl.style.display='none';
+    const desc=real?real.description:ev.desc;
+    if(desc){descEl.textContent=desc;descEl.style.display='block';}
+    else{descEl.style.display='none';}
+  }
+
   const btn=document.getElementById('ec-join');
   btn.textContent=isIn?'ABMELDEN':'DABEI →';
   btn.style.background=isIn?'#1a1a1a':ev.color;
   const isOwner = currentUser && ev.userId && ev.userId === currentUser.id;
   document.getElementById('ec-delete').style.display = isOwner ? 'flex' : 'none';
   document.getElementById('ev-card').classList.add('show');
-  if (leafMap && !globeActive) leafMap.panTo([ev.lat,ev.lng],{animate:true,duration:.4});
+  const panLat=real?real.lat:ev.lat, panLng=real?real.lng:ev.lng;
+  if (leafMap && !globeActive) leafMap.panTo([panLat,panLng],{animate:true,duration:.4});
 }
 function closeCard(){document.getElementById('ev-card').classList.remove('show');activeEv=null;}
+
+async function unlockEvent(){
+  if(!activeEv||!sb) return;
+  const ev=activeEv;
+  const pwInput=document.getElementById('ec-pw-input');
+  const pw=pwInput.value;
+  const errEl=document.getElementById('ec-pw-error');
+  const btn=document.getElementById('ec-unlock-btn');
+  errEl.style.display='none';
+  if(!pw){errEl.textContent='Bitte Passwort eingeben';errEl.style.display='block';return;}
+  btn.textContent='...';btn.disabled=true;
+  try{
+    const { data, error } = await sb.rpc('unlock_event', { p_event_id: ev.id, p_password: pw });
+    btn.textContent='Freischalten';btn.disabled=false;
+    if(error){errEl.textContent='Fehler: '+error.message;errEl.style.display='block';return;}
+    if(!data||!data.length){
+      errEl.textContent='Falsches Passwort';
+      errEl.style.display='block';
+      return;
+    }
+    const row=data[0];
+    unlockedEvents.add(ev.id);
+    unlockedData[ev.id]={
+      lat: parseFloat(row.real_lat),
+      lng: parseFloat(row.real_lng),
+      address: row.real_address,
+      description: row.real_description,
+    };
+    renderMarkers();
+    showCard(ev);
+    notify('Freigeschaltet 🔓','#30d158');
+  } catch(e){
+    btn.textContent='Freischalten';btn.disabled=false;
+    errEl.textContent='Fehler beim Freischalten';
+    errEl.style.display='block';
+  }
+}
 
 async function deleteEv(){
   if(!activeEv || activeEv.userId !== currentUser?.id) return;
@@ -966,6 +1045,7 @@ async function deleteEv(){
     if(error){notify('Fehler beim Löschen','#ff9f0a');delBtn.textContent='🗑';delBtn.disabled=false;return;}
   }
   if(markers[ev.id]){leafMap.removeLayer(markers[ev.id]);delete markers[ev.id];}
+  if(circles[ev.id]){leafMap.removeLayer(circles[ev.id]);delete circles[ev.id];}
   events=events.filter(e=>e.id!==ev.id);
   joined=joined.filter(x=>x!==ev.id);
   closeCard();
